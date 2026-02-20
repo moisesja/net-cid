@@ -88,6 +88,10 @@ Reference examples are available under `examples/` and mirror the `js-multiforma
 
 See `examples/README.md` for run commands.
 
+## Contributing
+
+See `contributors.md` for contributor workflow, quality checklist, and PR expectations.
+
 ## CI / Release
 
 - CI workflow: `.github/workflows/ci.yml`

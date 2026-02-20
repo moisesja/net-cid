@@ -12,6 +12,8 @@
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
     <RepositoryType>git</RepositoryType>
+    <RepositoryUrl>https://github.com/moisesja/net-cid</RepositoryUrl>
+    <PackageProjectUrl>https://github.com/moisesja/net-cid</PackageProjectUrl>
     <Deterministic>true</Deterministic>
     <PublishRepositoryUrl>true</PublishRepositoryUrl>
     <EmbedUntrackedSources>true</EmbedUntrackedSources>

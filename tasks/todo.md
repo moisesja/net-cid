@@ -72,3 +72,27 @@
 - Added oversized-input tests (unit coverage now 30 tests passing).
 - Added four runnable C# examples under `examples/` mirroring js-multiformats example topics.
 - Updated `SECURITY_AUDIT.md` to reflect resolved findings and clean dependency scan results.
+
+---
+
+# Task: Contributor Guide
+
+## Scope
+- Create `contributors.md` with practical onboarding and contribution workflow guidance.
+- Align recommendations with established patterns from successful open source projects.
+
+## Plan
+- [x] Draft contributor guide sections tailored to this repository.
+- [x] Add local setup, testing, and PR quality expectations.
+- [x] Add contributor checklists and security/reporting paths.
+- [x] Review for clarity and repo-command accuracy.
+
+## Verification Checklist
+- [x] `contributors.md` exists at repository root.
+- [x] All command examples run against existing project paths.
+- [x] Content references existing repository files only.
+
+## Review
+- Added `contributors.md` with contributor guidance modeled on successful OSS practices (small focused PRs, verification discipline, and clear review context).
+- Included repo-specific setup and verification commands aligned with existing solution and example projects.
+- Documented PR quality expectations, contribution checklist, commit guidance, security reporting path, and licensing note.
