@@ -1,0 +1,21 @@
+# Build output
+bin/
+obj/
+
+# IDE
+.vs/
+.vscode/
+.idea/
+
+# Test output
+TestResults/
+*.trx
+*.coverage
+
+# Packages
+*.nupkg
+*.snupkg
+artifacts/
+
+# OS files
+.DS_Store
