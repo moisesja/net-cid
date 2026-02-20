@@ -52,6 +52,12 @@ public sealed class MultibaseTests
     }
 
     [Fact]
+    public void Decode_ThrowsOnInvalidBase32TrailingBits()
+    {
+        Assert.Throws<CidFormatException>(() => Multibase.Decode("bc"));
+    }
+
+    [Fact]
     public void EncodeDecode_Base36RoundTrip()
     {
         var bytes = new byte[] { 0, 1, 2, 3, 4, 5, 255 };
@@ -60,6 +66,18 @@ public sealed class MultibaseTests
 
         Assert.Equal(MultibaseEncoding.Base36Lower, encoding);
         Assert.Equal(bytes, decoded);
+    }
+
+    [Fact]
+    public void Decode_RejectsUppercasePayloadForLowerBase36()
+    {
+        Assert.Throws<CidFormatException>(() => Multibase.Decode("kABC"));
+    }
+
+    [Fact]
+    public void Decode_RejectsLowercasePayloadForUpperBase36()
+    {
+        Assert.Throws<CidFormatException>(() => Multibase.Decode("Kabc"));
     }
 
     [Fact]

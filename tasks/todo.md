@@ -96,3 +96,75 @@
 - Added `contributors.md` with contributor guidance modeled on successful OSS practices (small focused PRs, verification discipline, and clear review context).
 - Included repo-specific setup and verification commands aligned with existing solution and example projects.
 - Documented PR quality expectations, contribution checklist, commit guidance, security reporting path, and licensing note.
+
+---
+
+# Task: Adopt SimpleBase with NetCid Validation Wrapper
+
+## Scope
+- Replace internal base32/base36/base58 encode/decode algorithms with `SimpleBase`.
+- Preserve NetCid strict decoding and validation semantics for CID-facing parsing.
+- Keep public API and error behavior stable for existing callers.
+
+## Plan
+- [x] Add `SimpleBase` package reference to `NetCid/NetCid.csproj`.
+- [x] Refactor `NetCid/Multibase.cs` to delegate encoding/decoding primitives to `SimpleBase`.
+- [x] Keep wrapper validation for:
+  - supported prefixes only (`b`, `B`, `k`, `K`, `z`)
+  - base32 padding rejection and trailing-bit validation
+  - case-specific base36 validation
+  - max input length checks and CID-specific exception mapping
+- [x] Add/adjust tests for strict validation behavior when using `SimpleBase`.
+- [x] Run unit and integration tests and capture results.
+
+## Verification Checklist
+- [x] `dotnet test NetCid.Tests/NetCid.Tests.csproj -c Release`
+- [x] `dotnet test NetCid.IntegrationTests/NetCid.IntegrationTests.csproj -c Release`
+
+## Review
+- Added `SimpleBase` `5.6.0` as the only runtime package dependency in `NetCid/NetCid.csproj`.
+- Replaced custom base32/base36/base58 encode/decode primitives in `NetCid/Multibase.cs` with `SimpleBase` coders.
+- Preserved strict wrapper validation behavior for CID parsing:
+  - rejects base32 padding and invalid non-zero trailing bits
+  - enforces case-specific base36 alphabets based on multibase prefix
+  - enforces prefix and input-length restrictions unchanged
+- Added regression tests in `NetCid.Tests/MultibaseTests.cs` for trailing-bit rejection and base36 case-strict decoding.
+- Verified with tests:
+  - `dotnet test NetCid.Tests/NetCid.Tests.csproj -c Release` (33 passed)
+  - `dotnet test NetCid.IntegrationTests/NetCid.IntegrationTests.csproj -c Release` (3 passed)
+
+---
+
+# Task: Security Audit Round 2 (Post-SimpleBase Integration)
+
+## Scope
+- Perform a fresh end-to-end security audit after introducing `SimpleBase`.
+- Re-validate parser hardening, dependency posture, and runtime verification.
+- Produce an updated detailed audit report.
+
+## Plan
+- [x] Re-scan source for security-sensitive paths (`Cid`, `Multibase`, `Varint`, `MultihashDigest`).
+- [x] Run dependency checks (vulnerable + deprecated package scans).
+- [x] Run clean release build and full test suite.
+- [x] Execute targeted negative/fuzz-style validation checks for parser exception safety.
+- [x] Update `SECURITY_AUDIT.md` with dated findings and conclusions.
+
+## Verification Checklist
+- [x] `dotnet list NetCid.sln package --vulnerable --include-transitive`
+- [x] `dotnet list NetCid.sln package --deprecated`
+- [x] `dotnet build NetCid/NetCid.csproj -c Release --no-restore --tl:off -warnaserror`
+- [x] `dotnet build NetCid.Tests/NetCid.Tests.csproj -c Release --no-restore --tl:off`
+- [x] `dotnet build NetCid.IntegrationTests/NetCid.IntegrationTests.csproj -c Release --no-restore --tl:off`
+- [x] `dotnet build examples/cid-interface/CidInterfaceExample.csproj -c Release --no-restore --tl:off`
+- [x] `dotnet build examples/multicodec-interface/MulticodecInterfaceExample.csproj -c Release --no-restore --tl:off`
+- [x] `dotnet build examples/multihash-interface/MultihashInterfaceExample.csproj -c Release --no-restore --tl:off`
+- [x] `dotnet build examples/block-interface/BlockInterfaceExample.csproj -c Release --no-restore --tl:off`
+- [x] `dotnet test NetCid.Tests/NetCid.Tests.csproj -c Release`
+- [x] `dotnet test NetCid.IntegrationTests/NetCid.IntegrationTests.csproj -c Release`
+
+## Review
+- Manually reviewed security-sensitive parsers and validation paths across `Cid`, `Multibase`, `Varint`, and `MultihashDigest`.
+- Confirmed vulnerability and deprecation scans are clean after introducing `SimpleBase`.
+- Verified release builds for library, tests, and examples succeeded with zero warnings/errors in audited commands.
+- Executed fuzz-style malformed-input probes (ASCII `100k` plus Unicode `20k`) against multibase and CID APIs with no unexpected exception behavior.
+- Updated `SECURITY_AUDIT.md` with a new detailed Round 2 report and final release-readiness conclusion.

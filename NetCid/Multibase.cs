@@ -1,6 +1,3 @@
-using System.Numerics;
-using System.Text;
-
 namespace NetCid;
 
 /// <summary>
@@ -13,8 +10,6 @@ public static class Multibase
     /// </summary>
     public const int DefaultMaxInputLength = 4096;
 
-    private const string Base32LowerAlphabet = "abcdefghijklmnopqrstuvwxyz234567";
-    private const string Base32UpperAlphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ234567";
     private const string Base36LowerAlphabet = "0123456789abcdefghijklmnopqrstuvwxyz";
     private const string Base36UpperAlphabet = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ";
     private const string Base58BtcAlphabet = "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz";
@@ -135,11 +130,11 @@ public static class Multibase
     private static string EncodeWithoutPrefix(ReadOnlySpan<byte> bytes, MultibaseEncoding encoding)
         => encoding switch
         {
-            MultibaseEncoding.Base32Lower => EncodeBase32(bytes, Base32LowerAlphabet),
-            MultibaseEncoding.Base32Upper => EncodeBase32(bytes, Base32UpperAlphabet),
-            MultibaseEncoding.Base36Lower => EncodePositionalBase(bytes, Base36LowerAlphabet, '0'),
-            MultibaseEncoding.Base36Upper => EncodePositionalBase(bytes, Base36UpperAlphabet, '0'),
-            MultibaseEncoding.Base58Btc => EncodePositionalBase(bytes, Base58BtcAlphabet, '1'),
+            MultibaseEncoding.Base32Lower => SimpleBase.Base32.FileCoin.Encode(bytes, padding: false),
+            MultibaseEncoding.Base32Upper => SimpleBase.Base32.Rfc4648.Encode(bytes, padding: false),
+            MultibaseEncoding.Base36Lower => SimpleBase.Base36.LowerCase.Encode(bytes),
+            MultibaseEncoding.Base36Upper => SimpleBase.Base36.UpperCase.Encode(bytes),
+            MultibaseEncoding.Base58Btc => SimpleBase.Base58.Bitcoin.Encode(bytes),
             _ => throw new ArgumentOutOfRangeException(nameof(encoding), encoding, "Unsupported multibase encoding.")
         };
 
@@ -148,52 +143,57 @@ public static class Multibase
         {
             MultibaseEncoding.Base32Lower => DecodeBase32(payload),
             MultibaseEncoding.Base32Upper => DecodeBase32(payload),
-            MultibaseEncoding.Base36Lower => DecodePositionalBase(payload, Base36LowerIndex, 36, '0'),
-            MultibaseEncoding.Base36Upper => DecodePositionalBase(payload, Base36UpperIndex, 36, '0'),
-            MultibaseEncoding.Base58Btc => DecodePositionalBase(payload, Base58BtcIndex, 58, '1'),
+            MultibaseEncoding.Base36Lower => DecodePositionalBase(payload, Base36LowerIndex, SimpleBase.Base36.LowerCase),
+            MultibaseEncoding.Base36Upper => DecodePositionalBase(payload, Base36UpperIndex, SimpleBase.Base36.UpperCase),
+            MultibaseEncoding.Base58Btc => DecodePositionalBase(payload, Base58BtcIndex, SimpleBase.Base58.Bitcoin),
             _ => throw new ArgumentOutOfRangeException(nameof(encoding), encoding, "Unsupported multibase encoding.")
         };
 
-    private static string EncodeBase32(ReadOnlySpan<byte> bytes, string alphabet)
-    {
-        if (bytes.IsEmpty)
-        {
-            return string.Empty;
-        }
-
-        var output = new StringBuilder(((bytes.Length * 8) + 4) / 5);
-        var buffer = 0;
-        var bitsInBuffer = 0;
-
-        foreach (var current in bytes)
-        {
-            buffer = (buffer << 8) | current;
-            bitsInBuffer += 8;
-
-            while (bitsInBuffer >= 5)
-            {
-                bitsInBuffer -= 5;
-                output.Append(alphabet[(buffer >> bitsInBuffer) & 0x1F]);
-                buffer &= (1 << bitsInBuffer) - 1;
-            }
-        }
-
-        if (bitsInBuffer > 0)
-        {
-            output.Append(alphabet[(buffer << (5 - bitsInBuffer)) & 0x1F]);
-        }
-
-        return output.ToString();
-    }
-
     private static byte[] DecodeBase32(ReadOnlySpan<char> payload)
     {
+        ValidateBase32Payload(payload);
+
         if (payload.IsEmpty)
         {
             return Array.Empty<byte>();
         }
 
-        var output = new List<byte>((payload.Length * 5) / 8);
+        var normalized = payload.ToString().ToLowerInvariant();
+
+        try
+        {
+            return SimpleBase.Base32.FileCoin.Decode(normalized);
+        }
+        catch (ArgumentException ex)
+        {
+            throw new CidFormatException("Invalid base32 character.", ex);
+        }
+    }
+
+    private static byte[] DecodePositionalBase(
+        ReadOnlySpan<char> payload,
+        IReadOnlyDictionary<char, int> alphabetIndex,
+        SimpleBase.IBaseCoder decoder)
+    {
+        ValidatePositionalPayload(payload, alphabetIndex);
+
+        if (payload.IsEmpty)
+        {
+            return Array.Empty<byte>();
+        }
+
+        try
+        {
+            return decoder.Decode(payload);
+        }
+        catch (ArgumentException ex)
+        {
+            throw new CidFormatException("Invalid character for multibase payload.", ex);
+        }
+    }
+
+    private static void ValidateBase32Payload(ReadOnlySpan<char> payload)
+    {
         var buffer = 0;
         var bitsInBuffer = 0;
 
@@ -223,7 +223,6 @@ public static class Multibase
             while (bitsInBuffer >= 8)
             {
                 bitsInBuffer -= 8;
-                output.Add((byte)((buffer >> bitsInBuffer) & 0xFF));
                 buffer &= (1 << bitsInBuffer) - 1;
             }
         }
@@ -232,78 +231,17 @@ public static class Multibase
         {
             throw new CidFormatException("Invalid non-zero trailing bits in base32 payload.");
         }
-
-        return output.ToArray();
     }
 
-    private static string EncodePositionalBase(ReadOnlySpan<byte> bytes, string alphabet, char zeroSymbol)
+    private static void ValidatePositionalPayload(ReadOnlySpan<char> payload, IReadOnlyDictionary<char, int> alphabetIndex)
     {
-        if (bytes.IsEmpty)
-        {
-            return string.Empty;
-        }
-
-        var leadingZeroes = 0;
-        while (leadingZeroes < bytes.Length && bytes[leadingZeroes] == 0)
-        {
-            leadingZeroes++;
-        }
-
-        var value = new BigInteger(bytes, isUnsigned: true, isBigEndian: true);
-        var output = new StringBuilder(bytes.Length * 2);
-        while (value > BigInteger.Zero)
-        {
-            value = BigInteger.DivRem(value, alphabet.Length, out var remainder);
-            output.Append(alphabet[(int)remainder]);
-        }
-
-        for (var index = 0; index < leadingZeroes; index++)
-        {
-            output.Append(zeroSymbol);
-        }
-
-        var chars = output.ToString().ToCharArray();
-        Array.Reverse(chars);
-        return new string(chars);
-    }
-
-    private static byte[] DecodePositionalBase(
-        ReadOnlySpan<char> payload,
-        IReadOnlyDictionary<char, int> alphabetIndex,
-        int radix,
-        char zeroSymbol)
-    {
-        if (payload.IsEmpty)
-        {
-            return Array.Empty<byte>();
-        }
-
-        var leadingZeroes = 0;
-        while (leadingZeroes < payload.Length && payload[leadingZeroes] == zeroSymbol)
-        {
-            leadingZeroes++;
-        }
-
-        var value = BigInteger.Zero;
         foreach (var current in payload)
         {
-            if (!alphabetIndex.TryGetValue(current, out var digit))
+            if (!alphabetIndex.ContainsKey(current))
             {
                 throw new CidFormatException("Invalid character for multibase payload.");
             }
-
-            value = (value * radix) + digit;
         }
-
-        var decoded = value.IsZero ? Array.Empty<byte>() : value.ToByteArray(isUnsigned: true, isBigEndian: true);
-        if (leadingZeroes == 0)
-        {
-            return decoded;
-        }
-
-        var result = new byte[leadingZeroes + decoded.Length];
-        decoded.CopyTo(result.AsSpan(leadingZeroes));
-        return result;
     }
 
     private static IReadOnlyDictionary<char, int> BuildAlphabetIndex(string alphabet)
