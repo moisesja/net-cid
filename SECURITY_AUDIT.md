@@ -8,10 +8,11 @@ Scope covered:
 
 - Library source under `NetCid/`
 - Unit/integration tests
+- Examples under `examples/`
 - CI/CD and security workflows
 - NuGet package metadata and release pipeline
 
-Overall result: **No critical or high-risk issues identified** in the shipped library code. One low-risk maintenance finding was identified in test dependencies.
+Overall result: **No open critical, high, medium, low, or informational findings.**
 
 ## Methodology
 
@@ -28,32 +29,37 @@ Overall result: **No critical or high-risk issues identified** in the shipped li
 4. Supply chain checks
    - `dotnet list NetCid.sln package --vulnerable --include-transitive`
    - `dotnet list NetCid.sln package --deprecated`
-5. CI security controls review
-   - `.github/workflows/security.yml`
-   - `.github/workflows/codeql.yml`
+5. Example validation
+   - `dotnet run --project examples/cid-interface/CidInterfaceExample.csproj -c Release --no-build`
+   - `dotnet run --project examples/multicodec-interface/MulticodecInterfaceExample.csproj -c Release --no-build`
+   - `dotnet run --project examples/multihash-interface/MultihashInterfaceExample.csproj -c Release --no-build`
+   - `dotnet run --project examples/block-interface/BlockInterfaceExample.csproj -c Release --no-build`
 
-## Findings
+## Resolved Findings
 
-### Finding 1: Deprecated Test Framework Package (Low)
+### Finding 1: Deprecated Test Framework Package (Resolved)
 
-- Severity: **Low**
-- Component: `NetCid.Tests`, `NetCid.IntegrationTests`
-- Detail: `xunit` v2 is flagged as legacy/deprecated by NuGet metadata.
-- Impact: No production runtime impact (test-only dependency), but future maintenance risk.
-- Recommendation: Upgrade tests to xUnit v3 when migration is scheduled.
+- Previous issue: `xunit` v2 package flagged as legacy/deprecated.
+- Resolution: migrated tests to `xunit.v3` and updated `xunit.runner.visualstudio`.
+- Verification: `dotnet list NetCid.sln package --deprecated` reports no deprecated packages.
 
-### Finding 2: Unbounded Input Size Could Increase Memory Pressure (Informational)
+### Finding 2: Unbounded Input Size Could Increase Memory Pressure (Resolved)
 
-- Severity: **Informational**
-- Component: parsing APIs accepting arbitrary external input strings/bytes
-- Detail: Extremely large attacker-controlled input may cause high memory use before rejection.
-- Impact: Potential denial-of-service risk in hostile input environments.
-- Recommendation: Enforce caller-side maximum CID input lengths at trust boundaries (API gateway, transport parser, etc.).
+- Previous issue: parsing APIs accepted unbounded external input sizes.
+- Resolution:
+  - Added default input size limits in parsing surfaces:
+    - `Cid.DefaultMaxInputStringLength`
+    - `Cid.DefaultMaxInputByteLength`
+    - `Multibase.DefaultMaxInputLength`
+  - Added overloads to `Cid.Parse/TryParse/Decode/TryDecode` and `Multibase.Decode/TryDecode/DecodeBase58Btc` to enforce/max-configure limits.
+  - Added unit tests asserting oversized input rejection.
+- Verification: unit tests include oversized-input scenarios and pass.
 
-## Implemented Security Controls
+## Current Security Controls
 
 - Strict CID version handling (`v2` and `v3` rejected as reserved)
 - CIDv0 canonical constraints enforced (`sha2-256`, 32-byte digest)
+- Explicit input-size limits on public parsing APIs
 - Unsigned varint decoder rejects non-canonical/oversized encodings
 - Multibase decoder validates alphabet and trailing bits
 - No unsafe blocks or native interop used
@@ -66,8 +72,8 @@ Overall result: **No critical or high-risk issues identified** in the shipped li
 ## Supply Chain Results
 
 - Vulnerability scan: **no vulnerable packages found**
-- Deprecated packages: **xunit (test projects only)**
+- Deprecated packages: **none**
 
 ## Conclusion
 
-The library is ready for release from a security posture perspective with current controls. Addressing the low-risk test dependency deprecation and optionally adding input-size limits would further strengthen long-term maintainability and resilience.
+The previously reported findings are fully resolved. The library is currently release-ready from a security and supply-chain perspective, with input boundary enforcement and non-deprecated test dependencies in place.

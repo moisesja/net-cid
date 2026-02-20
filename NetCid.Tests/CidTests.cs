@@ -84,4 +84,31 @@ public sealed class CidTests
         Assert.False(ok);
         Assert.Null(cid);
     }
+
+    [Fact]
+    public void Parse_RejectsOversizedInputString()
+    {
+        var oversized = "b" + new string('a', Cid.DefaultMaxInputStringLength);
+
+        var exception = Assert.Throws<CidFormatException>(() => Cid.Parse(oversized));
+        Assert.Contains("exceeds the allowed limit", exception.Message, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void Decode_RejectsOversizedInputBytes()
+    {
+        var oversized = new byte[Cid.DefaultMaxInputByteLength + 1];
+
+        var exception = Assert.Throws<CidFormatException>(() => Cid.Decode(oversized));
+        Assert.Contains("exceeds the allowed limit", exception.Message, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void TryParse_ReturnsFalseWhenLimitIsTooSmall()
+    {
+        var ok = Cid.TryParse(KnownV1Base32, out var cid, maxInputStringLength: 8, maxInputByteLength: Cid.DefaultMaxInputByteLength);
+
+        Assert.False(ok);
+        Assert.Null(cid);
+    }
 }

@@ -61,4 +61,22 @@ public sealed class MultibaseTests
         Assert.Equal(MultibaseEncoding.Base36Lower, encoding);
         Assert.Equal(bytes, decoded);
     }
+
+    [Fact]
+    public void Decode_RejectsOversizedInput()
+    {
+        var oversized = "z" + new string('1', Multibase.DefaultMaxInputLength);
+
+        var exception = Assert.Throws<CidFormatException>(() => Multibase.Decode(oversized));
+        Assert.Contains("supported multibase", exception.Message, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void DecodeBase58Btc_RejectsOversizedInput()
+    {
+        var oversized = new string('1', Multibase.DefaultMaxInputLength + 1);
+
+        var exception = Assert.Throws<CidFormatException>(() => Multibase.DecodeBase58Btc(oversized));
+        Assert.Contains("exceeds the allowed limit", exception.Message, StringComparison.OrdinalIgnoreCase);
+    }
 }

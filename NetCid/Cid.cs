@@ -6,6 +6,17 @@ namespace NetCid;
 public sealed class Cid : IEquatable<Cid>
 {
     private const int CanonicalV0ByteLength = 34;
+
+    /// <summary>
+    /// Default maximum allowed length for CID text input.
+    /// </summary>
+    public const int DefaultMaxInputStringLength = 4096;
+
+    /// <summary>
+    /// Default maximum allowed size for CID binary input.
+    /// </summary>
+    public const int DefaultMaxInputByteLength = 1_048_576;
+
     private readonly byte[] _bytes;
 
     private Cid(CidVersion version, ulong codec, MultihashDigest multihash, byte[] bytes)
@@ -90,33 +101,48 @@ public sealed class Cid : IEquatable<Cid>
     }
 
     public static Cid Parse(string value)
+        => Parse(value, DefaultMaxInputStringLength, DefaultMaxInputByteLength);
+
+    public static Cid Parse(string value, int maxInputStringLength, int maxInputByteLength)
     {
+        ValidateLimit(maxInputStringLength, nameof(maxInputStringLength));
+        ValidateLimit(maxInputByteLength, nameof(maxInputByteLength));
+
         if (string.IsNullOrWhiteSpace(value))
         {
             throw new CidFormatException("CID string cannot be null, empty, or whitespace.");
         }
 
-        if (LooksLikeV0String(value))
+        if (value.Length > maxInputStringLength)
         {
-            return Decode(Multibase.DecodeBase58Btc(value));
+            throw new CidFormatException(
+                $"CID string length {value.Length} exceeds the allowed limit of {maxInputStringLength} characters.");
         }
 
-        var bytes = Multibase.Decode(value, out _);
+        if (LooksLikeV0String(value))
+        {
+            return Decode(Multibase.DecodeBase58Btc(value, maxInputStringLength), maxInputByteLength);
+        }
+
+        var bytes = Multibase.Decode(value, out _, maxInputStringLength);
         if (!bytes.AsSpan().IsEmpty && bytes[0] == MultihashCode.Sha2_256)
         {
             throw new CidFormatException("CIDv0 string must not be multibase-prefixed.");
         }
 
-        return Decode(bytes);
+        return Decode(bytes, maxInputByteLength);
     }
 
     public static bool TryParse(string value, out Cid? cid)
+        => TryParse(value, out cid, DefaultMaxInputStringLength, DefaultMaxInputByteLength);
+
+    public static bool TryParse(string value, out Cid? cid, int maxInputStringLength, int maxInputByteLength)
     {
         cid = null;
 
         try
         {
-            cid = Parse(value);
+            cid = Parse(value, maxInputStringLength, maxInputByteLength);
             return true;
         }
         catch (Exception ex) when (ex is CidFormatException or ArgumentException)
@@ -126,10 +152,21 @@ public sealed class Cid : IEquatable<Cid>
     }
 
     public static Cid Decode(ReadOnlySpan<byte> bytes)
+        => Decode(bytes, DefaultMaxInputByteLength);
+
+    public static Cid Decode(ReadOnlySpan<byte> bytes, int maxInputByteLength)
     {
+        ValidateLimit(maxInputByteLength, nameof(maxInputByteLength));
+
         if (bytes.IsEmpty)
         {
             throw new CidFormatException("CID bytes cannot be empty.");
+        }
+
+        if (bytes.Length > maxInputByteLength)
+        {
+            throw new CidFormatException(
+                $"CID byte length {bytes.Length} exceeds the allowed limit of {maxInputByteLength} bytes.");
         }
 
         if (LooksLikeCanonicalV0Bytes(bytes))
@@ -179,11 +216,14 @@ public sealed class Cid : IEquatable<Cid>
     }
 
     public static bool TryDecode(ReadOnlySpan<byte> bytes, out Cid? cid)
+        => TryDecode(bytes, out cid, DefaultMaxInputByteLength);
+
+    public static bool TryDecode(ReadOnlySpan<byte> bytes, out Cid? cid, int maxInputByteLength)
     {
         cid = null;
         try
         {
-            cid = Decode(bytes);
+            cid = Decode(bytes, maxInputByteLength);
             return true;
         }
         catch (CidFormatException)
@@ -277,6 +317,14 @@ public sealed class Cid : IEquatable<Cid>
         if (multihash.Code != MultihashCode.Sha2_256 || multihash.DigestLength != 32)
         {
             throw new InvalidOperationException("CIDv0 requires a sha2-256 multihash with 32-byte digest.");
+        }
+    }
+
+    private static void ValidateLimit(int value, string parameterName)
+    {
+        if (value < 1)
+        {
+            throw new ArgumentOutOfRangeException(parameterName, value, "Input size limit must be at least 1.");
         }
     }
 }

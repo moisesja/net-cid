@@ -8,6 +8,11 @@ namespace NetCid;
 /// </summary>
 public static class Multibase
 {
+    /// <summary>
+    /// Default maximum allowed length for multibase text input.
+    /// </summary>
+    public const int DefaultMaxInputLength = 4096;
+
     private const string Base32LowerAlphabet = "abcdefghijklmnopqrstuvwxyz234567";
     private const string Base32UpperAlphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ234567";
     private const string Base36LowerAlphabet = "0123456789abcdefghijklmnopqrstuvwxyz";
@@ -32,11 +37,14 @@ public static class Multibase
     public static string EncodeBase58Btc(ReadOnlySpan<byte> bytes, bool includePrefix = false)
         => Encode(bytes, MultibaseEncoding.Base58Btc, includePrefix);
 
-    public static byte[] Decode(string text) => Decode(text, out _);
+    public static byte[] Decode(string text) => Decode(text, out _, DefaultMaxInputLength);
 
     public static byte[] Decode(string text, out MultibaseEncoding encoding)
+        => Decode(text, out encoding, DefaultMaxInputLength);
+
+    public static byte[] Decode(string text, out MultibaseEncoding encoding, int maxInputLength)
     {
-        if (!TryDecode(text, out var bytes, out encoding))
+        if (!TryDecode(text, out var bytes, out encoding, maxInputLength))
         {
             throw new CidFormatException("Input is not a valid supported multibase string.");
         }
@@ -45,11 +53,20 @@ public static class Multibase
     }
 
     public static bool TryDecode(string text, out byte[] bytes, out MultibaseEncoding encoding)
+        => TryDecode(text, out bytes, out encoding, DefaultMaxInputLength);
+
+    public static bool TryDecode(string text, out byte[] bytes, out MultibaseEncoding encoding, int maxInputLength)
     {
         bytes = Array.Empty<byte>();
         encoding = default;
+        ValidateLimit(maxInputLength);
 
         if (string.IsNullOrEmpty(text))
+        {
+            return false;
+        }
+
+        if (text.Length > maxInputLength)
         {
             return false;
         }
@@ -74,8 +91,18 @@ public static class Multibase
     }
 
     public static byte[] DecodeBase58Btc(string payload)
+        => DecodeBase58Btc(payload, DefaultMaxInputLength);
+
+    public static byte[] DecodeBase58Btc(string payload, int maxInputLength)
     {
+        ValidateLimit(maxInputLength);
         ArgumentException.ThrowIfNullOrEmpty(payload);
+        if (payload.Length > maxInputLength)
+        {
+            throw new CidFormatException(
+                $"Multibase input length {payload.Length} exceeds the allowed limit of {maxInputLength} characters.");
+        }
+
         return DecodeWithoutPrefix(payload, MultibaseEncoding.Base58Btc);
     }
 
@@ -288,5 +315,16 @@ public static class Multibase
         }
 
         return index;
+    }
+
+    private static void ValidateLimit(int maxInputLength)
+    {
+        if (maxInputLength < 1)
+        {
+            throw new ArgumentOutOfRangeException(
+                nameof(maxInputLength),
+                maxInputLength,
+                "Maximum input length must be at least 1.");
+        }
     }
 }

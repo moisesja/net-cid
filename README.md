@@ -53,6 +53,16 @@ Implementation follows the CID spec behavior, including:
 - CIDv0 string form has no multibase prefix
 - CID versions `2` and `3` are treated as reserved/invalid
 
+## Input Limits
+
+Parsing APIs enforce default size limits to reduce memory-pressure risk from untrusted input:
+
+- `Cid.DefaultMaxInputStringLength`
+- `Cid.DefaultMaxInputByteLength`
+- `Multibase.DefaultMaxInputLength`
+
+Overloads on parse/decode methods let callers provide custom limits when needed.
+
 References:
 
 - https://github.com/multiformats/cid
@@ -66,6 +76,17 @@ dotnet build NetCid.sln -c Release
 dotnet test NetCid.Tests/NetCid.Tests.csproj -c Release
 dotnet test NetCid.IntegrationTests/NetCid.IntegrationTests.csproj -c Release
 ```
+
+## Examples
+
+Reference examples are available under `examples/` and mirror the `js-multiformats` example set:
+
+- `examples/cid-interface`
+- `examples/multicodec-interface`
+- `examples/multihash-interface`
+- `examples/block-interface`
+
+See `examples/README.md` for run commands.
 
 ## CI / Release
 
