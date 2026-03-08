@@ -97,4 +97,70 @@ public sealed class MultibaseTests
         var exception = Assert.Throws<CidFormatException>(() => Multibase.DecodeBase58Btc(oversized));
         Assert.Contains("exceeds the allowed limit", exception.Message, StringComparison.OrdinalIgnoreCase);
     }
+
+    [Fact]
+    public void Encode_ProducesKnownBase64UrlVector()
+    {
+        var bytes = Convert.FromHexString(KnownCidBytesHex);
+        var encoded = Multibase.Encode(bytes, MultibaseEncoding.Base64Url, includePrefix: true);
+
+        Assert.StartsWith("u", encoded);
+        // Decode back and verify round-trip
+        var decoded = Multibase.Decode(encoded, out var encoding);
+        Assert.Equal(MultibaseEncoding.Base64Url, encoding);
+        Assert.Equal(bytes, decoded);
+    }
+
+    [Fact]
+    public void EncodeDecode_Base64UrlRoundTrip()
+    {
+        var bytes = new byte[] { 0, 1, 2, 3, 4, 5, 255 };
+        var encoded = Multibase.Encode(bytes, MultibaseEncoding.Base64Url, includePrefix: true);
+        var decoded = Multibase.Decode(encoded, out var encoding);
+
+        Assert.Equal(MultibaseEncoding.Base64Url, encoding);
+        Assert.Equal(bytes, decoded);
+    }
+
+    [Fact]
+    public void Decode_RecognizesBase64UrlPrefix()
+    {
+        // "hello" in base64url is "aGVsbG8"
+        var encoded = "u" + "aGVsbG8";
+        var decoded = Multibase.Decode(encoded, out var encoding);
+
+        Assert.Equal(MultibaseEncoding.Base64Url, encoding);
+        Assert.Equal("hello"u8.ToArray(), decoded);
+    }
+
+    [Fact]
+    public void Decode_ThrowsOnInvalidBase64UrlCharacter_Padding()
+    {
+        Assert.Throws<CidFormatException>(() => Multibase.Decode("uaGVsbG8="));
+    }
+
+    [Fact]
+    public void Decode_ThrowsOnInvalidBase64UrlCharacter_Plus()
+    {
+        Assert.Throws<CidFormatException>(() => Multibase.Decode("uaGV+bG8"));
+    }
+
+    [Fact]
+    public void Decode_ThrowsOnInvalidBase64UrlCharacter_Slash()
+    {
+        Assert.Throws<CidFormatException>(() => Multibase.Decode("uaGV/bG8"));
+    }
+
+    [Fact]
+    public void EncodeDecode_Base64UrlEmptyInput()
+    {
+        var bytes = Array.Empty<byte>();
+        var encoded = Multibase.Encode(bytes, MultibaseEncoding.Base64Url, includePrefix: true);
+
+        Assert.Equal("u", encoded);
+
+        var decoded = Multibase.Decode(encoded, out var encoding);
+        Assert.Equal(MultibaseEncoding.Base64Url, encoding);
+        Assert.Empty(decoded);
+    }
 }

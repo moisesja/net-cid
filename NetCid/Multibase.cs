@@ -1,3 +1,5 @@
+using System.Buffers.Text;
+
 namespace NetCid;
 
 /// <summary>
@@ -110,10 +112,11 @@ public static class Multibase
             'k' => MultibaseEncoding.Base36Lower,
             'K' => MultibaseEncoding.Base36Upper,
             'z' => MultibaseEncoding.Base58Btc,
+            'u' => MultibaseEncoding.Base64Url,
             _ => default
         };
 
-        return prefix is 'b' or 'B' or 'k' or 'K' or 'z';
+        return prefix is 'b' or 'B' or 'k' or 'K' or 'z' or 'u';
     }
 
     public static char GetPrefix(MultibaseEncoding encoding)
@@ -124,6 +127,7 @@ public static class Multibase
             MultibaseEncoding.Base36Lower => 'k',
             MultibaseEncoding.Base36Upper => 'K',
             MultibaseEncoding.Base58Btc => 'z',
+            MultibaseEncoding.Base64Url => 'u',
             _ => throw new ArgumentOutOfRangeException(nameof(encoding), encoding, "Unsupported multibase encoding.")
         };
 
@@ -135,6 +139,7 @@ public static class Multibase
             MultibaseEncoding.Base36Lower => SimpleBase.Base36.LowerCase.Encode(bytes),
             MultibaseEncoding.Base36Upper => SimpleBase.Base36.UpperCase.Encode(bytes),
             MultibaseEncoding.Base58Btc => SimpleBase.Base58.Bitcoin.Encode(bytes),
+            MultibaseEncoding.Base64Url => Base64Url.EncodeToString(bytes),
             _ => throw new ArgumentOutOfRangeException(nameof(encoding), encoding, "Unsupported multibase encoding.")
         };
 
@@ -146,6 +151,7 @@ public static class Multibase
             MultibaseEncoding.Base36Lower => DecodePositionalBase(payload, Base36LowerIndex, SimpleBase.Base36.LowerCase),
             MultibaseEncoding.Base36Upper => DecodePositionalBase(payload, Base36UpperIndex, SimpleBase.Base36.UpperCase),
             MultibaseEncoding.Base58Btc => DecodePositionalBase(payload, Base58BtcIndex, SimpleBase.Base58.Bitcoin),
+            MultibaseEncoding.Base64Url => DecodeBase64Url(payload),
             _ => throw new ArgumentOutOfRangeException(nameof(encoding), encoding, "Unsupported multibase encoding.")
         };
 
@@ -189,6 +195,37 @@ public static class Multibase
         catch (ArgumentException ex)
         {
             throw new CidFormatException("Invalid character for multibase payload.", ex);
+        }
+    }
+
+    private static byte[] DecodeBase64Url(ReadOnlySpan<char> payload)
+    {
+        ValidateBase64UrlPayload(payload);
+
+        if (payload.IsEmpty)
+        {
+            return Array.Empty<byte>();
+        }
+
+        try
+        {
+            return Base64Url.DecodeFromChars(payload);
+        }
+        catch (FormatException ex)
+        {
+            throw new CidFormatException("Invalid base64url payload.", ex);
+        }
+    }
+
+    private static void ValidateBase64UrlPayload(ReadOnlySpan<char> payload)
+    {
+        foreach (var current in payload)
+        {
+            var valid = current is (>= 'A' and <= 'Z') or (>= 'a' and <= 'z') or (>= '0' and <= '9') or '-' or '_';
+            if (!valid)
+            {
+                throw new CidFormatException("Invalid base64url character.");
+            }
         }
     }
 

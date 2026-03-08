@@ -168,3 +168,42 @@
 - Verified release builds for library, tests, and examples succeeded with zero warnings/errors in audited commands.
 - Executed fuzz-style malformed-input probes (ASCII `100k` plus Unicode `20k`) against multibase and CID APIs with no unexpected exception behavior.
 - Updated `SECURITY_AUDIT.md` with a new detailed Round 2 report and final release-readiness conclusion.
+
+---
+
+# Task: Add base64url multibase encoding and key-type multicodec support
+
+## Scope
+- Add base64url (`u`) multibase encoding to eliminate NetDid's duplicated encoding logic.
+- Add 7 key-type multicodec constants used by DID methods and Verifiable Credentials.
+- Add `Multicodec.Prefix()` / `Decode()` / `TryDecode()` convenience API for varint-tagged byte buffers.
+- Add examples and architecture documentation.
+- Bump version to 1.2.0.
+
+## Plan
+- [x] Add `Base64Url` to `MultibaseEncoding` enum
+- [x] Wire base64url encode/decode into `Multibase` class (using `System.Buffers.Text.Base64Url`)
+- [x] Add 7 key-type constants to `Multicodec` (ed25519-pub, p256-pub, secp256k1-pub, etc.)
+- [x] Add `Multicodec.Prefix()` / `Decode()` / `TryDecode()` methods
+- [x] Add base64url tests to `MultibaseTests.cs`
+- [x] Create `MulticodecTests.cs` with key-type lookup and Prefix/Decode tests
+- [x] Create `examples/multibase-interface` example
+- [x] Create `examples/did-key-interface` example
+- [x] Create `ARCHITECTURE.md` with objectives, requirements, and design
+- [x] Bump version to 1.2.0 and update README.md
+
+## Verification Checklist
+- [x] `dotnet build NetCid.sln -c Release` — 0 warnings, 0 errors
+- [x] `dotnet test NetCid.Tests/NetCid.Tests.csproj -c Release` — 67 passed
+- [x] `dotnet test NetCid.IntegrationTests/NetCid.IntegrationTests.csproj -c Release` — 3 passed
+- [x] `dotnet run --project examples/multibase-interface/MultibaseInterfaceExample.csproj` — runs successfully
+- [x] `dotnet run --project examples/did-key-interface/DidKeyInterfaceExample.csproj` — runs successfully
+
+## Review
+- Added base64url multibase encoding using .NET's built-in `System.Buffers.Text.Base64Url` (RFC 4648 §5, no padding).
+- Added 7 key-type multicodec constants: `secp256k1-pub`, `bls12-381-g1-pub`, `bls12-381-g2-pub`, `x25519-pub`, `ed25519-pub`, `p256-pub`, `p384-pub`.
+- Added `Multicodec.Prefix()` / `Decode()` / `TryDecode()` convenience API using existing `Varint` primitives.
+- Added 7 new multibase tests and 12 new multicodec tests (total: 67 unit + 3 integration, all passing).
+- Created two new examples: `multibase-interface` (encoding comparison) and `did-key-interface` (did:key construction workflow).
+- Created `ARCHITECTURE.md` documenting objectives, spec conformance, module design, encoding flows, and design decisions.
+- Bumped version from 1.1.0 to 1.2.0.

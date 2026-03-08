@@ -31,6 +31,15 @@ public static class Multicodec
     public const ulong ZcashTx = 0xC1;
     public const ulong DagJson = 0x0129;
 
+    // Key-type codecs (used by DID methods, Verifiable Credentials, etc.)
+    public const ulong Secp256k1Pub = 0xE7;
+    public const ulong Bls12381G1Pub = 0xEA;
+    public const ulong Bls12381G2Pub = 0xEB;
+    public const ulong X25519Pub = 0xEC;
+    public const ulong Ed25519Pub = 0xED;
+    public const ulong P256Pub = 0x1200;
+    public const ulong P384Pub = 0x1201;
+
     private static readonly IReadOnlyDictionary<ulong, string> NamesByCode = new ReadOnlyDictionary<ulong, string>(
         new Dictionary<ulong, string>
         {
@@ -56,7 +65,14 @@ public static class Multicodec
             [BitcoinTx] = "bitcoin-tx",
             [ZcashBlock] = "zcash-block",
             [ZcashTx] = "zcash-tx",
-            [DagJson] = "dag-json"
+            [DagJson] = "dag-json",
+            [Secp256k1Pub] = "secp256k1-pub",
+            [Bls12381G1Pub] = "bls12-381-g1-pub",
+            [Bls12381G2Pub] = "bls12-381-g2-pub",
+            [X25519Pub] = "x25519-pub",
+            [Ed25519Pub] = "ed25519-pub",
+            [P256Pub] = "p256-pub",
+            [P384Pub] = "p384-pub"
         });
 
     private static readonly IReadOnlyDictionary<string, ulong> CodesByName = new ReadOnlyDictionary<string, ulong>(
@@ -67,4 +83,46 @@ public static class Multicodec
     public static bool TryGetName(ulong code, out string? name) => NamesByCode.TryGetValue(code, out name);
 
     public static bool TryGetCode(string name, out ulong code) => CodesByName.TryGetValue(name, out code);
+
+    /// <summary>
+    /// Prefix raw bytes with the varint-encoded multicodec tag.
+    /// </summary>
+    public static byte[] Prefix(ulong codec, ReadOnlySpan<byte> rawBytes)
+    {
+        var prefixLength = Varint.GetEncodedLength(codec);
+        var result = new byte[checked(prefixLength + rawBytes.Length)];
+        Varint.Write(codec, result);
+        rawBytes.CopyTo(result.AsSpan(prefixLength));
+        return result;
+    }
+
+    /// <summary>
+    /// Decode a multicodec-prefixed byte buffer, returning the codec and raw bytes.
+    /// </summary>
+    public static (ulong Codec, byte[] RawBytes) Decode(ReadOnlySpan<byte> prefixedBytes)
+    {
+        if (!TryDecode(prefixedBytes, out var codec, out var rawBytes))
+        {
+            throw new CidFormatException("Invalid multicodec-prefixed data.");
+        }
+
+        return (codec, rawBytes!);
+    }
+
+    /// <summary>
+    /// Try to decode a multicodec-prefixed byte buffer.
+    /// </summary>
+    public static bool TryDecode(ReadOnlySpan<byte> prefixedBytes, out ulong codec, out byte[]? rawBytes)
+    {
+        codec = 0;
+        rawBytes = null;
+
+        if (!Varint.TryDecode(prefixedBytes, out codec, out var bytesRead))
+        {
+            return false;
+        }
+
+        rawBytes = prefixedBytes.Slice(bytesRead).ToArray();
+        return true;
+    }
 }
