@@ -33,6 +33,24 @@ Console.WriteLine($"  Input:    {base64UrlEncoded}");
 Console.WriteLine($"  Detected: {detectedEncoding}");
 Console.WriteLine($"  Decoded:  {Encoding.UTF8.GetString(decoded)}");
 
+// --- Case-insensitive base36 decoding ---
+
+Console.WriteLine("\nBase36 is case-insensitive (important for DNS compatibility):\n");
+
+var base36Bytes = Encoding.UTF8.GetBytes("case-test");
+var base36Lower = Multibase.Encode(base36Bytes, MultibaseEncoding.Base36Lower, includePrefix: true);
+
+// Simulate a DNS system uppercasing the payload
+var uppercased = "k" + base36Lower[1..].ToUpperInvariant();
+
+Console.WriteLine($"  Original (base36lower): {base36Lower}");
+Console.WriteLine($"  After uppercasing:      {uppercased}");
+
+var recoveredBytes = Multibase.Decode(uppercased, out var recoveredEncoding);
+Console.WriteLine($"  Decoded encoding:       {recoveredEncoding}");
+Console.WriteLine($"  Decoded text:           {Encoding.UTF8.GetString(recoveredBytes)}");
+Console.WriteLine($"  Round-trip matches:     {base36Bytes.SequenceEqual(recoveredBytes)}");
+
 // --- Compare output sizes ---
 
 Console.WriteLine("\nOutput size comparison (20 random bytes):\n");
