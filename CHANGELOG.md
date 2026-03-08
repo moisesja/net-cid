@@ -5,7 +5,7 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [Released]
 
 ## [1.2.1] - 2026-03-08
 
@@ -14,7 +14,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Base36 decoding is now case-insensitive per the multibase spec, allowing mixed-case payloads (e.g., from DNS systems) to decode correctly ([#3](https://github.com/moisesja/net-cid/issues/3))
 - BLS public-key multicodec names corrected from `bls12-381-g1-pub` / `bls12-381-g2-pub` to `bls12_381-g1-pub` / `bls12_381-g2-pub` to match the official multicodec registry ([#5](https://github.com/moisesja/net-cid/issues/5))
 
-## [1.2.0] - 2025-12-01
+## [1.2.0] - 2026-03-08
 
 ### Added
 
