@@ -4,8 +4,8 @@ public sealed class MulticodecTests
 {
     [Theory]
     [InlineData(Multicodec.Secp256k1Pub, "secp256k1-pub")]
-    [InlineData(Multicodec.Bls12381G1Pub, "bls12-381-g1-pub")]
-    [InlineData(Multicodec.Bls12381G2Pub, "bls12-381-g2-pub")]
+    [InlineData(Multicodec.Bls12381G1Pub, "bls12_381-g1-pub")]
+    [InlineData(Multicodec.Bls12381G2Pub, "bls12_381-g2-pub")]
     [InlineData(Multicodec.X25519Pub, "x25519-pub")]
     [InlineData(Multicodec.Ed25519Pub, "ed25519-pub")]
     [InlineData(Multicodec.P256Pub, "p256-pub")]
@@ -18,8 +18,8 @@ public sealed class MulticodecTests
 
     [Theory]
     [InlineData("secp256k1-pub", Multicodec.Secp256k1Pub)]
-    [InlineData("bls12-381-g1-pub", Multicodec.Bls12381G1Pub)]
-    [InlineData("bls12-381-g2-pub", Multicodec.Bls12381G2Pub)]
+    [InlineData("bls12_381-g1-pub", Multicodec.Bls12381G1Pub)]
+    [InlineData("bls12_381-g2-pub", Multicodec.Bls12381G2Pub)]
     [InlineData("x25519-pub", Multicodec.X25519Pub)]
     [InlineData("ed25519-pub", Multicodec.Ed25519Pub)]
     [InlineData("p256-pub", Multicodec.P256Pub)]
