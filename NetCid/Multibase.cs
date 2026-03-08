@@ -148,8 +148,8 @@ public static class Multibase
         {
             MultibaseEncoding.Base32Lower => DecodeBase32(payload),
             MultibaseEncoding.Base32Upper => DecodeBase32(payload),
-            MultibaseEncoding.Base36Lower => DecodePositionalBase(payload, Base36LowerIndex, SimpleBase.Base36.LowerCase),
-            MultibaseEncoding.Base36Upper => DecodePositionalBase(payload, Base36UpperIndex, SimpleBase.Base36.UpperCase),
+            MultibaseEncoding.Base36Lower => DecodeBase36(payload, toUpper: false),
+            MultibaseEncoding.Base36Upper => DecodeBase36(payload, toUpper: true),
             MultibaseEncoding.Base58Btc => DecodePositionalBase(payload, Base58BtcIndex, SimpleBase.Base58.Bitcoin),
             MultibaseEncoding.Base64Url => DecodeBase64Url(payload),
             _ => throw new ArgumentOutOfRangeException(nameof(encoding), encoding, "Unsupported multibase encoding.")
@@ -173,6 +173,34 @@ public static class Multibase
         catch (ArgumentException ex)
         {
             throw new CidFormatException("Invalid base32 character.", ex);
+        }
+    }
+
+    private static byte[] DecodeBase36(ReadOnlySpan<char> payload, bool toUpper)
+    {
+        if (payload.IsEmpty)
+        {
+            return Array.Empty<byte>();
+        }
+
+        var normalized = toUpper
+            ? payload.ToString().ToUpperInvariant()
+            : payload.ToString().ToLowerInvariant();
+
+        var alphabetIndex = toUpper ? Base36UpperIndex : Base36LowerIndex;
+        var decoder = toUpper
+            ? (SimpleBase.IBaseCoder)SimpleBase.Base36.UpperCase
+            : SimpleBase.Base36.LowerCase;
+
+        ValidatePositionalPayload(normalized, alphabetIndex);
+
+        try
+        {
+            return decoder.Decode(normalized);
+        }
+        catch (ArgumentException ex)
+        {
+            throw new CidFormatException("Invalid character for multibase payload.", ex);
         }
     }
 
