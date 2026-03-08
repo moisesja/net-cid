@@ -20,6 +20,21 @@ Console.WriteLine($"Round-trip value: {JsonSerializer.Serialize(decoded)}");
 var cid = Cid.CreateV1(jsonCodec.Code, MultihashDigest.Sha2_256(encoded));
 Console.WriteLine($"CID with custom codec: {cid}");
 
+// --- Key-type multicodec lookups ---
+
+Console.WriteLine("\nKey-type multicodec lookups (name ↔ code):\n");
+
+var keyCodecs = new[] { "secp256k1-pub", "bls12_381-g1-pub", "bls12_381-g2-pub", "ed25519-pub", "p256-pub" };
+
+foreach (var name in keyCodecs)
+{
+    if (Multicodec.TryGetCode(name, out var code))
+    {
+        Multicodec.TryGetName(code, out var roundTrippedName);
+        Console.WriteLine($"  {name,-20} → 0x{code:X} → {roundTrippedName}");
+    }
+}
+
 internal sealed record SimpleCodec<T>(
     string Name,
     ulong Code,
