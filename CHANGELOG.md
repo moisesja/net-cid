@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.2.1] - 2026-03-08
+
 ### Fixed
 
 - Base36 decoding is now case-insensitive per the multibase spec, allowing mixed-case payloads (e.g., from DNS systems) to decode correctly ([#3](https://github.com/moisesja/net-cid/issues/3))
@@ -35,7 +37,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - SHA-256 and SHA-512 multihash support
 - Core multicodec constants (raw, dag-pb, dag-cbor, etc.)
 
-[Unreleased]: https://github.com/moisesja/net-cid/compare/v1.2.0...HEAD
+[Unreleased]: https://github.com/moisesja/net-cid/compare/v1.2.1...HEAD
+[1.2.1]: https://github.com/moisesja/net-cid/compare/v1.2.0...v1.2.1
 [1.2.0]: https://github.com/moisesja/net-cid/compare/v1.1.0...v1.2.0
 [1.1.0]: https://github.com/moisesja/net-cid/compare/v1.0.0...v1.1.0
 [1.0.0]: https://github.com/moisesja/net-cid/releases/tag/v1.0.0
