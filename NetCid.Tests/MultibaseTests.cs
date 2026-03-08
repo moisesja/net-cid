@@ -69,15 +69,29 @@ public sealed class MultibaseTests
     }
 
     [Fact]
-    public void Decode_RejectsUppercasePayloadForLowerBase36()
+    public void Decode_AcceptsMixedCasePayloadForLowerBase36()
     {
-        Assert.Throws<CidFormatException>(() => Multibase.Decode("kABC"));
+        var bytes = new byte[] { 1, 2, 3 };
+        var canonical = Multibase.Encode(bytes, MultibaseEncoding.Base36Lower, includePrefix: true);
+        var mixedCase = "k" + canonical[1..].ToUpperInvariant();
+
+        var decoded = Multibase.Decode(mixedCase, out var encoding);
+
+        Assert.Equal(MultibaseEncoding.Base36Lower, encoding);
+        Assert.Equal(bytes, decoded);
     }
 
     [Fact]
-    public void Decode_RejectsLowercasePayloadForUpperBase36()
+    public void Decode_AcceptsMixedCasePayloadForUpperBase36()
     {
-        Assert.Throws<CidFormatException>(() => Multibase.Decode("Kabc"));
+        var bytes = new byte[] { 1, 2, 3 };
+        var canonical = Multibase.Encode(bytes, MultibaseEncoding.Base36Upper, includePrefix: true);
+        var mixedCase = "K" + canonical[1..].ToLowerInvariant();
+
+        var decoded = Multibase.Decode(mixedCase, out var encoding);
+
+        Assert.Equal(MultibaseEncoding.Base36Upper, encoding);
+        Assert.Equal(bytes, decoded);
     }
 
     [Fact]
