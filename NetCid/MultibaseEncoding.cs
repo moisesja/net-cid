@@ -9,5 +9,6 @@ public enum MultibaseEncoding
     Base32Upper,
     Base36Lower,
     Base36Upper,
-    Base58Btc
+    Base58Btc,
+    Base64Url
 }

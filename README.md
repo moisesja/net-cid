@@ -13,7 +13,10 @@
   - `base58btc` (`z`)
   - `base32` lower/upper (`b` / `B`)
   - `base36` lower/upper (`k` / `K`)
+  - `base64url` (`u`)
 - Multicodec constants for common CID codecs (`raw`, `dag-pb`, `dag-cbor`, etc.)
+- Multicodec key-type constants (`ed25519-pub`, `p256-pub`, `secp256k1-pub`, etc.)
+- Multicodec prefix/decode API for varint-tagged byte buffers
 
 ## Install
 
@@ -85,6 +88,8 @@ Reference examples are available under `examples/` and mirror the `js-multiforma
 - `examples/multicodec-interface`
 - `examples/multihash-interface`
 - `examples/block-interface`
+- `examples/multibase-interface`
+- `examples/did-key-interface`
 
 See `examples/README.md` for run commands.
 
