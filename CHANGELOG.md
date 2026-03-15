@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Released]
 
+## [1.3.0] - 2026-03-15
+
+### Added
+
+- `Multihash.Encode(ulong hashFunctionCode, ReadOnlySpan<byte> digest)` for constructing spec-compliant multihash bytes: `varint(code) || varint(digestLength) || digest` ([#7](https://github.com/moisesja/net-cid/issues/7))
+- `Multihash.Decode` and `Multihash.TryDecode` for parsing multihash byte sequences back into code and digest
+
 ## [1.2.1] - 2026-03-08
 
 ### Fixed
@@ -37,7 +44,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - SHA-256 and SHA-512 multihash support
 - Core multicodec constants (raw, dag-pb, dag-cbor, etc.)
 
-[Unreleased]: https://github.com/moisesja/net-cid/compare/v1.2.1...HEAD
+[Unreleased]: https://github.com/moisesja/net-cid/compare/v1.3.0...HEAD
+[1.3.0]: https://github.com/moisesja/net-cid/compare/v1.2.1...v1.3.0
 [1.2.1]: https://github.com/moisesja/net-cid/compare/v1.2.0...v1.2.1
 [1.2.0]: https://github.com/moisesja/net-cid/compare/v1.1.0...v1.2.0
 [1.1.0]: https://github.com/moisesja/net-cid/compare/v1.0.0...v1.1.0
