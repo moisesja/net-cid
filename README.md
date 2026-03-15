@@ -9,6 +9,7 @@
 - Binary CID decode/encode
 - Unsigned varint codec (multiformats-compatible, max 9-byte encoding)
 - Multihash model + SHA-256 / SHA-512 hash helpers
+- `Multihash.Encode` / `Decode` for spec-compliant multihash wire format (`varint(code) || varint(digestLength) || digest`)
 - Multibase support for:
   - `base58btc` (`z`)
   - `base32` lower/upper (`b` / `B`)
