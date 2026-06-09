@@ -36,11 +36,24 @@ jobs:
         run: dotnet test NetCid.IntegrationTests/NetCid.IntegrationTests.csproj -c Release --no-build --tl:off
 
       - name: Dependency Vulnerability Scan (gated)
+        # `dotnet list package --vulnerable` exits 0 even when it reports
+        # advisories, so the build is gated on the command's OUTPUT. We fail on
+        # either of two signals that appear only when packages are actually
+        # vulnerable: the summary header, and the per-advisory GitHub URL. The
+        # advisory URL is locale-independent and survives a header rewording, so
+        # it guards against a silent fail-open if a future SDK changes the
+        # wording. DOTNET_CLI_UI_LANGUAGE=en additionally pins the output
+        # language so a non-en runner locale cannot reword the header out from
+        # under the match. Sentinels verified against .NET SDK 10.0.100; if a
+        # future SDK reworks both the header and the advisory-URL format,
+        # re-verify the patterns below.
+        env:
+          DOTNET_CLI_UI_LANGUAGE: en
         run: |
           set -euo pipefail
           out="$(dotnet list NetCid.sln package --vulnerable --include-transitive)"
           echo "$out"
-          if printf '%s\n' "$out" | grep -qiF 'has the following vulnerable packages'; then
+          if printf '%s\n' "$out" | grep -qiE 'has the following vulnerable packages|https?://github\.com/advisories/'; then
             echo "::error::Vulnerable packages detected"
             exit 1
           fi
