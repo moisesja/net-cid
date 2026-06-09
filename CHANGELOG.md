@@ -5,7 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Released]
+## [Unreleased]
+
+### Security
+
+- Made the NuGet dependency vulnerability scan fail the build when `dotnet list --vulnerable --include-transitive` reports an advisory of any severity, in both the `ci` and `security` workflows; previously the scan only printed its findings and always exited `0`, so a newly vulnerable transitive dependency could merge cleanly ([#25](https://github.com/moisesja/net-cid/issues/25)).
+- Added a release-workflow guard that verifies the pushed git tag matches the package `<Version>` in `NetCid.csproj` before packing and publishing, so a tag/version mismatch fails fast instead of mispublishing or being silently swallowed by `--skip-duplicate` ([#26](https://github.com/moisesja/net-cid/issues/26)).
 
 ## [1.6.0] - 2026-06-07
 

@@ -17,6 +17,8 @@ The library also serves as a shared foundation for higher-level protocols that d
 | [Multicodec](https://github.com/multiformats/multicodec) | Content-type codecs (dag-pb, raw, dag-cbor, etc.), key-type codecs (ed25519-pub, p256-pub, etc.), varint prefix/decode API |
 | [Multihash](https://github.com/multiformats/multihash) | Digest model, SHA-256, SHA-512 |
 | [Unsigned Varint](https://github.com/multiformats/unsigned-varint) | Encode/decode, max 9-byte encoding, canonical form validation |
+| [RFC 8785 (JCS)](https://www.rfc-editor.org/rfc/rfc8785) | JSON Canonicalization Scheme: member-name sorting, ECMA-262 number serialization, UTF-8 output; rejects NaN/±∞, unpaired surrogates, duplicate member names, and over-deep nesting |
+| [W3C Controlled Identifiers / Multikey](https://www.w3.org/TR/controlled-identifiers/) | `Multikey` / `did:key` `publicKeyMultibase` encode/decode over base58btc with per-codec raw-key-length validation |
 
 ### Design Goals
 
@@ -29,18 +31,21 @@ The library also serves as a shared foundation for higher-level protocols that d
 ## Module Design
 
 ```
-┌─────────────────────────────────────────────────────┐
-│                       Cid                           │
-│  Top-level model: version + codec + multihash       │
-│  Parse / Decode / Create / ToString / ToByteArray   │
-├──────────────┬──────────────┬───────────────────────┤
-│  Multibase   │  Multicodec  │   MultihashDigest     │
-│  Encode text │  Codec IDs   │   Hash code + digest  │
-│  Decode text │  Prefix API  │   SHA-256 / SHA-512   │
-├──────────────┴──────┬───────┴───────────────────────┤
-│                  Varint                              │
-│  Unsigned varint encode / decode (LEB128 variant)   │
-└─────────────────────────────────────────────────────┘
+┌───────────────────────────────────────┐   ┌──────────────────────────────┐
+│                  Cid                   │   │             JCS              │
+│  Top-level model: version + codec +    │   │  JcsCanonicalizer            │
+│  multihash                             │◀──│  + EcmaScriptNumber          │
+│  Parse / Decode / Create / ToString /  │   │  + JcsFormatException        │
+│  ToByteArray / FromCanonicalJson       │   │  RFC 8785 JSON → UTF-8 bytes │
+├──────────────┬──────────────┬──────────┤   └──────────────────────────────┘
+│  Multibase   │  Multicodec  │ Multihash │     Cid.FromCanonicalJson(json)
+│  Encode text │  Codec IDs   │ Digest    │     canonicalizes JSON, then
+│  Decode text │  Prefix API  │ SHA-2     │     hashes it into a CID.
+├──────────────┴──────┬───────┴──────────┤
+│                  Varint                 │
+│  Unsigned varint encode / decode        │
+│  (LEB128 variant)                        │
+└──────────────────────────────────────────┘
 ```
 
 ### Class Responsibilities
@@ -50,6 +55,7 @@ The library also serves as a shared foundation for higher-level protocols that d
 | `Varint` | `NetCid/Varint.cs` | Foundational layer. Encodes/decodes unsigned variable-length integers per the multiformats unsigned-varint spec. All numeric fields in CID binary format flow through this. |
 | `MultihashCode` | `NetCid/MultihashCode.cs` | Constants for hash function identifiers (SHA-256 = `0x12`, SHA-512 = `0x13`, etc.). |
 | `MultihashDigest` | `NetCid/MultihashDigest.cs` | Immutable model representing a multihash: `[varint(code)][varint(digestLength)][digest]`. Provides `Sha2_256()` and `Sha2_512()` factory methods. |
+| `Multihash` | `NetCid/Multihash.cs` | Static `Encode()` / `Decode()` / `TryDecode()` helpers over the raw multihash byte form (`varint(code) || varint(length) || digest`), delegating to `MultihashDigest` for callers that want bytes/tuples rather than the model. |
 | `Multicodec` | `NetCid/Multicodec.cs` | Constants for content-type codecs (dag-pb, raw, etc.) and key-type codecs (ed25519-pub, p256-pub, etc.). Bidirectional name/code lookup table. `Prefix()` / `Decode()` / `TryDecode()` API for varint-tagging arbitrary byte buffers. |
 | `Multikey` | `NetCid/Multikey.cs` | W3C Controlled Identifiers Multikey / `did:key` `publicKeyMultibase` helpers. `Encode()` / `Decode()` / `TryDecode()` compose `Multicodec.Prefix` + `Multibase` (base58btc, strict) and add per-codec raw-key-length validation for the eight supported public-key codecs. |
 | `MultibaseEncoding` | `NetCid/MultibaseEncoding.cs` | Enum of supported base encodings. |
@@ -57,6 +63,9 @@ The library also serves as a shared foundation for higher-level protocols that d
 | `CidVersion` | `NetCid/CidVersion.cs` | Enum: `V0`, `V1`. |
 | `Cid` | `NetCid/Cid.cs` | Top-level CID model composing version + codec + multihash. Provides `Parse()` / `TryParse()` (from strings), `Decode()` / `TryDecode()` (from bytes), `CreateV0()` / `CreateV1()` / `FromContent()` (construction), `ToString()` / `ToByteArray()` (serialization), and `ToV0()` / `ToV1()` (version conversion). |
 | `CidFormatException` | `NetCid/CidFormatException.cs` | Domain-specific `FormatException` subclass for all parse/decode failures. |
+| `JcsCanonicalizer` | `NetCid/JcsCanonicalizer.cs` | RFC 8785 JSON canonicalization → stable UTF-8 bytes for hashing/signing. `Canonicalize()` over `string` / `JsonElement` / `JsonNode`; sorts member names, normalizes numbers, rejects duplicate keys, unpaired surrogates, and over-deep nesting. |
+| `EcmaScriptNumber` | `NetCid/EcmaScriptNumber.cs` | Internal ECMA-262 §6.1.6.1.20 number-to-string helper used by JCS (RFC 8785 §3.2.2.3) to render IEEE-754 doubles in the exact canonical textual form. |
+| `JcsFormatException` | `NetCid/JcsFormatException.cs` | `FormatException` subclass for values JCS cannot represent deterministically (NaN/±∞, unpaired surrogates, duplicate member names, over-deep or over-large input). |
 
 ### Encoding Flow
 
@@ -117,7 +126,13 @@ consumers get a single API instead of hand-assembling the prefix.
 
 ### Static Classes
 
-All utility classes (`Varint`, `Multibase`, `Multicodec`, `MultihashCode`) are static. These are pure functions over byte data with no state — there is nothing to inject or configure. This keeps the API surface minimal and usage straightforward.
+All utility classes (`Varint`, `Multibase`, `Multicodec`, `MultihashCode`, `JcsCanonicalizer`) are static. These are pure functions over byte (or JSON) data with no state — there is nothing to inject or configure. This keeps the API surface minimal and usage straightforward.
+
+### JSON Canonicalization (JCS)
+
+`JcsCanonicalizer` lives in this library because content-addressing of JSON requires the *same* deterministic byte sequence that CID hashing already depends on. To hash, sign, or compute a CID over a JSON document, two independent writers must produce byte-for-byte identical output for the same logical value; RFC 8785 (JCS) defines that canonical form (sorted member names, normalized number text, UTF-8). Co-locating it with the multiformats stack lets `Cid.FromCanonicalJson` go straight from JSON to a CID without callers reaching for a separate canonicalization dependency, and reuses the same defense-in-depth posture (depth and output-size caps) as the CID/Multibase parse paths.
+
+The v1 canonicalizer handled integer-valued numbers only. Version 1.6.0 widened it to the full ECMA-262 §6.1.6.1.20 number scope (the textual form RFC 8785 §3.2.2.3 mandates for IEEE-754 doubles), via the `EcmaScriptNumber` helper, while continuing to reject values JCS cannot represent deterministically (`NaN`, `±∞`) with `JcsFormatException`.
 
 ### Span-Based APIs
 

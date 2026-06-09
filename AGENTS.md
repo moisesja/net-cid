@@ -15,7 +15,7 @@ This file provides instructions for AI agents and human contributors working in 
 
 - Use subagents liberally to keep main context window clean
 - Offload research, exploration, and parallel analysis to subagents
-- Always use adverserial agents to attempt to exploit the code that is being generated. The adverserial agents must report in detail about any findings
+- Always use adversarial agents to attempt to exploit the code that is being generated. The adversarial agents must report in detail about any findings
 - For complex problems, throw more compute at it via subagents
 - One task per subagent for focused execution
 
@@ -54,7 +54,7 @@ This file provides instructions for AI agents and human contributors working in 
 
 - Never mark a task complete without proving it works
 - Diff behavior between main and your changes when relevant
-- Ask yourself: "Would a staff engineer approve this,"
+- Ask yourself: "Would a staff engineer approve this?"
 - Run tests, check logs, demonstrate correctness
 
 ### 5. Demand Elegance (Balanced)
@@ -77,7 +77,7 @@ This file provides instructions for AI agents and human contributors working in 
 2. **Verify Plan**: Check in before starting implementation
 3. **Track Progress**: Mark items complete as you go
 4. **Explain Changes**: High-level summary at each step
-5. **Document Results**: Add review section to 'tasks/todo{timestamp}.md
+5. **Document Results**: Add a review section to 'tasks/todo{timestamp}.md'
 6. **Capture Lessons**: Update 'tasks/lessons.md' after corrections
 7. **Update Documents and Examples**: Always keep any relevant documentation and examples current with your code changes
 
