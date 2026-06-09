@@ -34,6 +34,18 @@ jobs:
       - name: Test (Integration)
         run: dotnet test NetCid.IntegrationTests/NetCid.IntegrationTests.csproj -c Release --no-build --tl:off
 
+      - name: Verify tag matches package version
+        run: |
+          set -euo pipefail
+          if [ "${GITHUB_REF_TYPE}" != "tag" ]; then
+            echo "Not a tag ref (${GITHUB_REF_TYPE}=${GITHUB_REF_NAME}); skipping tag/version check."
+            exit 0
+          fi
+          tag="${GITHUB_REF_NAME#v}"
+          ver="$(sed -n 's:.*<Version>\(.*\)</Version>.*:\1:p' NetCid/NetCid.csproj | head -1)"
+          echo "tag=$tag csproj=$ver"
+          [ "$tag" = "$ver" ] || { echo "::error::Tag v$tag does not match <Version> $ver"; exit 1; }
+
       - name: Pack
         run: dotnet pack NetCid/NetCid.csproj -c Release --no-build -o artifacts --tl:off
 

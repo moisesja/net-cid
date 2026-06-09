@@ -36,5 +36,12 @@ jobs:
       - name: Restore
         run: dotnet restore NetCid.sln --locked-mode --tl:off
 
-      - name: NuGet Vulnerability Scan
-        run: dotnet list NetCid.sln package --vulnerable --include-transitive
+      - name: NuGet Vulnerability Scan (gated)
+        run: |
+          set -euo pipefail
+          out="$(dotnet list NetCid.sln package --vulnerable --include-transitive)"
+          echo "$out"
+          if printf '%s\n' "$out" | grep -qiF 'has the following vulnerable packages'; then
+            echo "::error::Vulnerable packages detected"
+            exit 1
+          fi

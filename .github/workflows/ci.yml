@@ -35,8 +35,15 @@ jobs:
       - name: Test (Integration)
         run: dotnet test NetCid.IntegrationTests/NetCid.IntegrationTests.csproj -c Release --no-build --tl:off
 
-      - name: Dependency Vulnerability Scan
-        run: dotnet list NetCid.sln package --vulnerable --include-transitive
+      - name: Dependency Vulnerability Scan (gated)
+        run: |
+          set -euo pipefail
+          out="$(dotnet list NetCid.sln package --vulnerable --include-transitive)"
+          echo "$out"
+          if printf '%s\n' "$out" | grep -qiF 'has the following vulnerable packages'; then
+            echo "::error::Vulnerable packages detected"
+            exit 1
+          fi
 
       - name: Pack
         run: dotnet pack NetCid/NetCid.csproj -c Release --no-build -o artifacts --tl:off
