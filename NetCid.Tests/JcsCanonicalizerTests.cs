@@ -357,6 +357,71 @@ public sealed class JcsCanonicalizerTests
         Assert.Contains("infinity", ex.Message, StringComparison.OrdinalIgnoreCase);
     }
 
+    public static TheoryData<double> UnrepresentableDoubles => new()
+    {
+        double.NaN,
+        double.PositiveInfinity,
+        double.NegativeInfinity,
+    };
+
+    [Theory]
+    [MemberData(nameof(UnrepresentableDoubles))]
+    public void WrappedClrObject_NaN_Infinity_Throws_JcsFormatException(double value)
+    {
+        // ValidateNode cannot see inside a JsonValue wrapping a raw CLR object, so the NaN/∞
+        // surfaces from JsonSerializer.SerializeToDocument as an ArgumentException; it must be
+        // translated to JcsFormatException like every other unrepresentable-number path —
+        // the XML docs promise JcsFormatException unconditionally. Fails closed either way;
+        // only the exception type was wrong. See issue #47.
+        JsonNode node = JsonValue.Create(new Dictionary<string, object?> { ["amount"] = value })!;
+
+        var ex = Assert.Throws<JcsFormatException>(() => JcsCanonicalizer.Canonicalize(node));
+        Assert.Contains("NaN or infinity", ex.Message);
+    }
+
+    [Theory]
+    [MemberData(nameof(UnrepresentableDoubles))]
+    public void WrappedClrObject_NaN_Infinity_Throws_JcsFormatException_OnWriterOverload(double value)
+    {
+        JsonNode node = JsonValue.Create(new Dictionary<string, object?> { ["amount"] = value })!;
+        var writer = new ArrayBufferWriter<byte>();
+
+        Assert.Throws<JcsFormatException>(() => JcsCanonicalizer.Canonicalize(node, writer));
+        Assert.Equal(0, writer.WrittenCount);
+    }
+
+    [Fact]
+    public void WrappedClrObject_NaN_Throws_JcsFormatException_FromCidFromCanonicalJson()
+    {
+        JsonNode node = JsonValue.Create(new Dictionary<string, object?> { ["amount"] = double.NaN })!;
+
+        Assert.Throws<JcsFormatException>(() => Cid.FromCanonicalJson(node));
+    }
+
+    [Fact]
+    public void WrappedClrObject_NestedNaN_Throws_JcsFormatException()
+    {
+        // The NaN can hide arbitrarily deep in the wrapped object graph; SerializeToDocument
+        // still trips on it, and the translation must hold. See issue #47.
+        JsonNode node = JsonValue.Create(new Dictionary<string, object?>
+        {
+            ["outer"] = new object?[] { 1.0, new Dictionary<string, object?> { ["inner"] = float.NaN } },
+        })!;
+
+        Assert.Throws<JcsFormatException>(() => JcsCanonicalizer.Canonicalize(node));
+    }
+
+    [Fact]
+    public void WrappedClrObject_WithoutNaN_StillCanonicalizes()
+    {
+        // The widened catch must not over-reject: a clean wrapped CLR object keeps working.
+        JsonNode node = JsonValue.Create(new Dictionary<string, object?> { ["amount"] = 1.5 })!;
+
+        var bytes = JcsCanonicalizer.Canonicalize(node);
+
+        Assert.Equal("{\"amount\":1.5}", Encoding.UTF8.GetString(bytes));
+    }
+
     // RFC 8785 §3.2.2.3 vector table — every row in issue #13's vector table must round-trip.
     [Theory]
     [InlineData("0", "0")]
