@@ -375,7 +375,8 @@ public sealed class JcsCanonicalizerTests
         // only the exception type was wrong. See issue #47.
         JsonNode node = JsonValue.Create(new Dictionary<string, object?> { ["amount"] = value })!;
 
-        Assert.Throws<JcsFormatException>(() => JcsCanonicalizer.Canonicalize(node));
+        var ex = Assert.Throws<JcsFormatException>(() => JcsCanonicalizer.Canonicalize(node));
+        Assert.Contains("NaN or infinity", ex.Message);
     }
 
     [Theory]

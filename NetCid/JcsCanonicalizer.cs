@@ -228,15 +228,20 @@ public static class JcsCanonicalizer
         {
             document = JsonSerializer.SerializeToDocument(node, SerializeOptions);
         }
-        catch (Exception ex) when (ex is JsonException or ArgumentException)
+        catch (JsonException ex)
         {
-            // ArgumentException is System.Text.Json's signal for NaN/±infinity hidden inside a
-            // JsonValue wrapping a raw CLR object (e.g. a Dictionary/POCO), which ValidateNode
-            // cannot see into; it must surface as JcsFormatException like every other
-            // unrepresentable-number path (#47). Distinct from the duplicate-key
-            // ArgumentException around ValidateNode above, which intentionally falls through.
             throw new JcsFormatException(
                 "JSON value cannot be serialized for canonicalization.", ex);
+        }
+        catch (ArgumentException ex)
+        {
+            // System.Text.Json's signal for NaN/±infinity hidden inside a JsonValue wrapping a
+            // raw CLR object (e.g. a Dictionary/POCO), which ValidateNode cannot see into; it
+            // must surface as JcsFormatException like every other unrepresentable-number path
+            // (#47). Distinct from the duplicate-key ArgumentException around ValidateNode
+            // above, which intentionally falls through.
+            throw new JcsFormatException(
+                "JSON value contains NaN or infinity, which cannot be canonicalized.", ex);
         }
 
         using (document)
