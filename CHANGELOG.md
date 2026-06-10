@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Security
 
+- `Multibase` now rejects base32 payloads that carry an incomplete trailing symbol (payload length ≡ {1,3,6} mod 8). A canonical RFC 4648 no-padding base32 length is always ≡ {0,2,4,5,7} mod 8; the previous validator checked only that the unused trailing *bits* were zero, so appending a single zero-valued symbol (`a`/`A`) produced a distinct string that decoded to the same bytes — two distinct strings mapping to one CID (`Cid.Parse`), a CID string-malleability vector. Decoding such a non-canonical payload now throws `CidFormatException`; canonical CIDs are unaffected ([#42](https://github.com/moisesja/net-cid/issues/42)).
 - Made the NuGet dependency vulnerability scan fail the build when `dotnet list --vulnerable --include-transitive` reports an advisory of any severity, in both the `ci` and `security` workflows; previously the scan only printed its findings and always exited `0`, so a newly vulnerable transitive dependency could merge cleanly ([#25](https://github.com/moisesja/net-cid/issues/25)).
 - Added a release-workflow guard that verifies the pushed git tag matches the package `<Version>` in `NetCid.csproj` before packing and publishing, so a tag/version mismatch fails fast instead of mispublishing or being silently swallowed by `--skip-duplicate` ([#26](https://github.com/moisesja/net-cid/issues/26)).
 
