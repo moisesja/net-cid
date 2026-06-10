@@ -18,7 +18,7 @@ public sealed class MultikeyTests
     [MemberData(nameof(KeyCodecsAndLengths))]
     public void Encode_Decode_RoundTrips_ForEveryKeyCodec(ulong codec, int expectedLength)
     {
-        var rawKey = DeterministicKey(expectedLength);
+        var rawKey = DeterministicKey(codec, expectedLength);
 
         var multibase = Multikey.Encode(codec, rawKey);
 
@@ -33,7 +33,7 @@ public sealed class MultikeyTests
     [MemberData(nameof(KeyCodecsAndLengths))]
     public void TryDecode_Returns_True_ForRoundTrippedEncoding(ulong codec, int expectedLength)
     {
-        var rawKey = DeterministicKey(expectedLength);
+        var rawKey = DeterministicKey(codec, expectedLength);
         var multibase = Multikey.Encode(codec, rawKey);
 
         Assert.True(Multikey.TryDecode(multibase, out var decodedCodec, out var decodedKey));
@@ -157,12 +157,145 @@ public sealed class MultikeyTests
         Assert.Equal(rawKey, decoded);
     }
 
-    private static byte[] DeterministicKey(int length)
+    public static TheoryData<ulong, int> Sec1KeyCodecsAndLengths => new()
+    {
+        { Multicodec.Secp256k1Pub, 33 },
+        { Multicodec.P256Pub, 33 },
+        { Multicodec.P384Pub, 49 },
+        { Multicodec.P521Pub, 67 },
+    };
+
+    public static TheoryData<ulong, int, byte> Sec1CodecsWithInvalidPrefixes()
+    {
+        var data = new TheoryData<ulong, int, byte>();
+        foreach (var prefix in new byte[] { 0x00, 0x01, 0x04, 0x05, 0xFF })
+        {
+            data.Add(Multicodec.Secp256k1Pub, 33, prefix);
+            data.Add(Multicodec.P256Pub, 33, prefix);
+            data.Add(Multicodec.P384Pub, 49, prefix);
+            data.Add(Multicodec.P521Pub, 67, prefix);
+        }
+
+        return data;
+    }
+
+    [Theory]
+    [MemberData(nameof(Sec1CodecsWithInvalidPrefixes))]
+    public void Encode_Throws_OnInvalidSec1PointPrefix(ulong codec, int length, byte prefix)
+    {
+        // W3C Controlled Identifiers / vc-di-ecdsa mandate the SEC1 *compressed* point form
+        // (leading byte 0x02/0x03) for the Weierstrass-curve codecs; 0x04 (uncompressed) and
+        // every other prefix must be rejected, not silently minted into a did:key. See issue #45.
+        var rawKey = DeterministicKey(codec, length);
+        rawKey[0] = prefix;
+
+        var ex = Assert.Throws<ArgumentException>(() => Multikey.Encode(codec, rawKey));
+
+        Assert.Equal("rawKey", ex.ParamName);
+    }
+
+    [Theory]
+    [MemberData(nameof(Sec1CodecsWithInvalidPrefixes))]
+    public void TryDecode_Returns_False_OnInvalidSec1PointPrefix(ulong codec, int length, byte prefix)
+    {
+        // Build the multibase value manually (bypassing Encode's own validation) so the
+        // consumer path is exercised independently of the producer path. See issue #45.
+        var rawKey = DeterministicKey(codec, length);
+        rawKey[0] = prefix;
+        var prefixed = Multicodec.Prefix(codec, rawKey);
+        var multibase = Multibase.Encode(prefixed, MultibaseEncoding.Base58Btc, includePrefix: true);
+
+        Assert.False(Multikey.TryDecode(multibase, out var decodedCodec, out var decodedKey));
+        Assert.Equal(0UL, decodedCodec);
+        Assert.Null(decodedKey);
+        Assert.Throws<CidFormatException>(() => Multikey.Decode(multibase));
+    }
+
+    [Theory]
+    [MemberData(nameof(Sec1KeyCodecsAndLengths))]
+    public void EncodeDecode_RoundTrips_BothCompressedPrefixes(ulong codec, int length)
+    {
+        foreach (var prefix in new byte[] { 0x02, 0x03 })
+        {
+            var rawKey = DeterministicKey(codec, length);
+            rawKey[0] = prefix;
+
+            var multibase = Multikey.Encode(codec, rawKey);
+
+            Assert.True(Multikey.TryDecode(multibase, out var decodedCodec, out var decodedKey));
+            Assert.Equal(codec, decodedCodec);
+            Assert.Equal(rawKey, decodedKey);
+        }
+    }
+
+    [Theory]
+    [InlineData((byte)0x00)]
+    [InlineData((byte)0x01)]
+    public void P521_AcceptsFieldRangeTopByte(byte topByte)
+    {
+        var rawKey = DeterministicKey(Multicodec.P521Pub, 67);
+        rawKey[1] = topByte;
+
+        var multibase = Multikey.Encode(Multicodec.P521Pub, rawKey);
+
+        Assert.True(Multikey.TryDecode(multibase, out _, out var decodedKey));
+        Assert.Equal(rawKey, decodedKey);
+    }
+
+    [Fact]
+    public void P521_RejectsCoordinateAboveFieldRange()
+    {
+        // P-521's 66-byte big-endian x-coordinate is bounded by 2^521 - 1, so its top byte is
+        // 0x00 or 0x01; a larger top byte cannot be a field element. See issue #45.
+        var rawKey = DeterministicKey(Multicodec.P521Pub, 67);
+        rawKey[1] = 0x02;
+
+        Assert.Throws<ArgumentException>(() => Multikey.Encode(Multicodec.P521Pub, rawKey));
+
+        var prefixed = Multicodec.Prefix(Multicodec.P521Pub, rawKey);
+        var multibase = Multibase.Encode(prefixed, MultibaseEncoding.Base58Btc, includePrefix: true);
+        Assert.False(Multikey.TryDecode(multibase, out _, out _));
+    }
+
+    [Theory]
+    [InlineData(Multicodec.Ed25519Pub, 32)]
+    [InlineData(Multicodec.X25519Pub, 32)]
+    [InlineData(Multicodec.Bls12381G1Pub, 48)]
+    [InlineData(Multicodec.Bls12381G2Pub, 96)]
+    public void NonSec1KeyTypes_AcceptAnyLeadingByte(ulong codec, int length)
+    {
+        // ed25519/x25519/BLS keys are not SEC1 points — the prefix guard must not apply (#45).
+        foreach (var leading in new byte[] { 0x00, 0x04, 0xFF })
+        {
+            var rawKey = DeterministicKey(codec, length);
+            rawKey[0] = leading;
+
+            var multibase = Multikey.Encode(codec, rawKey);
+
+            Assert.True(Multikey.TryDecode(multibase, out var decodedCodec, out var decodedKey));
+            Assert.Equal(codec, decodedCodec);
+            Assert.Equal(rawKey, decodedKey);
+        }
+    }
+
+    private static byte[] DeterministicKey(int length) => DeterministicKey(Multicodec.Ed25519Pub, length);
+
+    private static byte[] DeterministicKey(ulong codec, int length)
     {
         var bytes = new byte[length];
         for (var i = 0; i < length; i++)
         {
             bytes[i] = (byte)(i + 1);
+        }
+
+        if (codec is Multicodec.Secp256k1Pub or Multicodec.P256Pub or Multicodec.P384Pub or Multicodec.P521Pub)
+        {
+            bytes[0] = 0x02; // SEC1 compressed-point prefix
+
+            if (codec == Multicodec.P521Pub)
+            {
+                bytes[1] = 0x01; // top byte of the 66-byte x-coordinate must be 0x00/0x01
+            }
         }
 
         return bytes;
