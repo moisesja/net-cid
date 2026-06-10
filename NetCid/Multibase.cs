@@ -299,6 +299,18 @@ public static class Multibase
             }
         }
 
+        // A canonical RFC 4648 (no-padding) base32 symbol count is always ≡ {0,2,4,5,7} mod 8, which
+        // leaves fewer than 5 unused trailing bits. Counts ≡ {1,3,6} mod 8 carry a whole *incomplete*
+        // trailing symbol (5/7/6 unused bits) that cannot occur canonically. When that symbol is the
+        // zero-valued 'a'/'A', the non-zero-bits check below passes and SimpleBase silently drops the
+        // incomplete group, so the non-canonical string decodes to the same bytes as the canonical one
+        // — CID string malleability (#42). Reject the dangling symbol; the check below still rejects
+        // non-zero padding bits for the legitimate {2,4,5,7} partial-group cases.
+        if (bitsInBuffer >= 5)
+        {
+            throw new CidFormatException("Invalid base32 payload length: incomplete trailing symbol.");
+        }
+
         if (bitsInBuffer > 0 && (buffer & ((1 << bitsInBuffer) - 1)) != 0)
         {
             throw new CidFormatException("Invalid non-zero trailing bits in base32 payload.");

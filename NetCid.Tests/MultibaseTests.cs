@@ -215,4 +215,47 @@ public sealed class MultibaseTests
         Assert.Equal(MultibaseEncoding.Base64Url, encoding);
         Assert.Equal(new[] { (byte)expected }, decoded);
     }
+
+    [Fact]
+    public void Decode_RejectsBase32IncompleteTrailingSymbolCollision()
+    {
+        // A canonical base32 CID has a payload length ≡ {0,2,4,5,7} mod 8. Appending one zero-valued
+        // symbol ('a') makes it ≡ 3 mod 8 — a whole incomplete trailing symbol that SimpleBase would
+        // silently drop, decoding to the SAME bytes as the canonical form. That is CID string
+        // malleability: two distinct strings → one CID. The canonical form decodes; the mutated form
+        // must throw. See issue #42.
+        var canonical = Multibase.Decode(KnownCidBase32, out var encoding);
+        Assert.Equal(MultibaseEncoding.Base32Lower, encoding);
+        Assert.Equal(KnownCidBytesHex, Convert.ToHexString(canonical).ToLowerInvariant());
+
+        Assert.Throws<CidFormatException>(() => Multibase.Decode(KnownCidBase32 + "a"));
+    }
+
+    [Theory]
+    [InlineData("ba")]        // payload len 1  (≡ 1 mod 8) — single dangling zero symbol
+    [InlineData("baaa")]      // payload len 3  (≡ 3 mod 8)
+    [InlineData("baaaaaa")]   // payload len 6  (≡ 6 mod 8)
+    public void Decode_ThrowsOnBase32IncompleteTrailingSymbol(string nonCanonical)
+    {
+        // Payload lengths ≡ {1,3,6} mod 8 carry an incomplete trailing base32 symbol (≥5 unused bits)
+        // that cannot occur in a canonical no-padding encoding. Even when those bits are zero (so the
+        // non-zero-trailing-bits check passes), the dangling symbol must be rejected to prevent
+        // malleability. See issue #42.
+        Assert.Throws<CidFormatException>(() => Multibase.Decode(nonCanonical));
+    }
+
+    [Theory]
+    [InlineData("baa", new byte[] { 0x00 })]                          // payload len 2 (≡ 2 mod 8)
+    [InlineData("baaaa", new byte[] { 0x00, 0x00 })]                  // payload len 4 (≡ 4 mod 8)
+    [InlineData("baaaaa", new byte[] { 0x00, 0x00, 0x00 })]           // payload len 5 (≡ 5 mod 8)
+    [InlineData("baaaaaaa", new byte[] { 0x00, 0x00, 0x00, 0x00 })]   // payload len 7 (≡ 7 mod 8)
+    public void Decode_AcceptsCanonicalBase32PartialGroupLengths(string canonical, byte[] expected)
+    {
+        // The legitimate partial-group lengths ({2,4,5,7} mod 8) leave <5 unused (zero) bits and must
+        // still decode — the incomplete-trailing-symbol guard added for #42 must not over-reject them.
+        var decoded = Multibase.Decode(canonical, out var encoding);
+
+        Assert.Equal(MultibaseEncoding.Base32Lower, encoding);
+        Assert.Equal(expected, decoded);
+    }
 }
