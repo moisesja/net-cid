@@ -183,6 +183,21 @@ public static class Multibase
             return Array.Empty<byte>();
         }
 
+        // Validate the RAW characters before any case-folding. ToLowerInvariant/ToUpperInvariant
+        // map two non-ASCII code points into the base36 alphabets (U+212A KELVIN SIGN → 'k',
+        // U+017F LATIN SMALL LETTER LONG S → 'S'), so folding first would let a distinct non-ASCII
+        // spelling decode to the same CID — string malleability (#43). Restricting the raw payload
+        // to ASCII letters/digits closes that while keeping the ASCII case-insensitivity pinned by
+        // Decode_AcceptsMixedCasePayloadFor{Lower,Upper}Base36; the post-fold
+        // ValidatePositionalPayload below still rejects ASCII non-alphanumerics.
+        foreach (var current in payload)
+        {
+            if (!char.IsAsciiLetterOrDigit(current))
+            {
+                throw new CidFormatException("Invalid character for multibase payload.");
+            }
+        }
+
         var normalized = toUpper
             ? payload.ToString().ToUpperInvariant()
             : payload.ToString().ToLowerInvariant();
