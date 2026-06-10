@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- SDK-native package validation (`EnablePackageValidation` + `PackageValidationBaselineVersion`) in `NetCid.csproj`: every `dotnet pack` — including the CI `build-test-pack` job on each PR — now compares the public API surface against the last **published** nuget.org version and fails on an undocumented breaking change. The baseline is `1.5.0` (note: `1.6.0` exists in the csproj/CHANGELOG but was never published to nuget.org). The single intentional 1.6.0-era break — `Cid.FromCanonicalJson` gaining the optional `maxOutputBytes` parameter ([#16](https://github.com/moisesja/net-cid/issues/16)), already documented as potentially breaking — is recorded in the new `NetCid/CompatibilitySuppressions.xml`. Release checklist: after shipping a version, bump the baseline to it and clear the suppressions ([#49](https://github.com/moisesja/net-cid/issues/49)).
+
 ### Fixed
 
 - `JcsCanonicalizer` now throws the documented `JcsFormatException` (instead of leaking System.Text.Json's `ArgumentException`) when `NaN`/`±Infinity` hides inside a `JsonValue` wrapping a raw CLR object (e.g. a `Dictionary`/POCO), across all `Canonicalize` overloads and `Cid.FromCanonicalJson`. The failure was already closed (no canonical bytes were produced) — only the exception type violated the documented contract. Parsed JSON text is unaffected (System.Text.Json rejects `NaN`/`Infinity` tokens at parse time); only programmatic node construction could reach this path ([#47](https://github.com/moisesja/net-cid/issues/47)).

@@ -21,6 +21,13 @@
     <SymbolPackageFormat>snupkg</SymbolPackageFormat>
     <NoWarn>$(NoWarn);CS1591;CA1707;CA1859</NoWarn>
     <ContinuousIntegrationBuild Condition="'$(GITHUB_ACTIONS)' == 'true'">true</ContinuousIntegrationBuild>
+    <!-- Public-API breaking-change guard (#49): dotnet pack compares this package's API
+         surface against the LAST PUBLISHED nuget.org version and fails on an undocumented
+         break. Intentional breaks are recorded in CompatibilitySuppressions.xml. On each
+         release: bump the baseline to the version just shipped and clear the suppressions.
+         Note: APIs added after the baseline version are not protected until the bump. -->
+    <EnablePackageValidation>true</EnablePackageValidation>
+    <PackageValidationBaselineVersion>1.5.0</PackageValidationBaselineVersion>
   </PropertyGroup>
 
   <ItemGroup>
