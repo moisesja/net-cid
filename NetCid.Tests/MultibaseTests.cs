@@ -6,6 +6,12 @@ public sealed class MultibaseTests
     private const string KnownCidBase58 = "zb2rhe5P4gXftAwvA4eXQ5HJwsER2owDyS9sKaQRRVQPn93bA";
     private const string KnownCidBase32 = "bafkreidon73zkcrwdb5iafqtijxildoonbwnpv7dyd6ef3qdgads2jc4su";
 
+    // CIDv1(raw, sha2-256("hello")) — its base36 forms contain both a payload 'k' (lower) and an
+    // 'S' (upper), the two targets of the #43 case-fold substitutions.
+    private const string KnownCidHelloBytesHex = "015512202cf24dba5fb0a30e26e83b2ac5b9e29e1b161e5c1fa7425e73043362938b9824";
+    private const string KnownCidBase36Lower = "k2cwue9rqdypmt3thjky14z1tk9fi9f0o5w7b3ofitdewlcf87lismqs";
+    private const string KnownCidBase36Upper = "K2CWUE9RQDYPMT3THJKY14Z1TK9FI9F0O5W7B3OFITDEWLCF87LISMQS";
+
     [Fact]
     public void Encode_ProducesKnownBase58Vector()
     {
@@ -257,5 +263,111 @@ public sealed class MultibaseTests
 
         Assert.Equal(MultibaseEncoding.Base32Lower, encoding);
         Assert.Equal(expected, decoded);
+    }
+
+    [Fact]
+    public void Decode_RejectsBase36KelvinSignCaseFoldCollision()
+    {
+        // ToLowerInvariant maps U+212A KELVIN SIGN to 'k'. Folding before validation accepted a
+        // payload 'k' replaced with U+212A — a distinct string decoding to the same CID bytes
+        // (string malleability, the base36 analogue of #42). The canonical form decodes; the
+        // Kelvin-substituted form must throw. See issue #43.
+        var canonical = Multibase.Decode(KnownCidBase36Lower, out var encoding);
+        Assert.Equal(MultibaseEncoding.Base36Lower, encoding);
+        Assert.Equal(KnownCidHelloBytesHex, Convert.ToHexString(canonical).ToLowerInvariant());
+
+        var kIndex = KnownCidBase36Lower.IndexOf('k', 1);
+        Assert.True(kIndex > 0);
+        var kelvinSubstituted = string.Concat(
+            KnownCidBase36Lower.AsSpan(0, kIndex), "\u212A", KnownCidBase36Lower.AsSpan(kIndex + 1));
+
+        Assert.Throws<CidFormatException>(() => Multibase.Decode(kelvinSubstituted));
+    }
+
+    [Fact]
+    public void Decode_RejectsBase36LongSCaseFoldCollision()
+    {
+        // ToUpperInvariant maps U+017F LATIN SMALL LETTER LONG S to 'S'. Same malleability class
+        // as the Kelvin case, on the base36-upper path. See issue #43.
+        var canonical = Multibase.Decode(KnownCidBase36Upper, out var encoding);
+        Assert.Equal(MultibaseEncoding.Base36Upper, encoding);
+        Assert.Equal(KnownCidHelloBytesHex, Convert.ToHexString(canonical).ToLowerInvariant());
+
+        var sIndex = KnownCidBase36Upper.IndexOf('S', 1);
+        Assert.True(sIndex > 0);
+        var longSSubstituted = string.Concat(
+            KnownCidBase36Upper.AsSpan(0, sIndex), "\u017F", KnownCidBase36Upper.AsSpan(sIndex + 1));
+
+        Assert.Throws<CidFormatException>(() => Multibase.Decode(longSSubstituted));
+    }
+
+    [Fact]
+    public void Base36CaseFoldSurvivors_AreExactlyKelvinAndLongS()
+    {
+        // Documents the threat inventory behind #43: scanning the full BMP, the only non-ASCII
+        // code points whose invariant case-fold lands inside a base36 alphabet are U+212A (lower)
+        // and U+017F (upper). If a future runtime's Unicode tables widen either set, this test
+        // fails and the new survivor needs the same end-to-end rejection pin as Kelvin/long-s.
+        var intoLower = new List<int>();
+        var intoUpper = new List<int>();
+        for (var codePoint = 0x80; codePoint <= 0xFFFF; codePoint++)
+        {
+            var candidate = (char)codePoint;
+            var lower = char.ToLowerInvariant(candidate);
+            var upper = char.ToUpperInvariant(candidate);
+            if (lower is (>= '0' and <= '9') or (>= 'a' and <= 'z'))
+            {
+                intoLower.Add(codePoint);
+            }
+
+            if (upper is (>= '0' and <= '9') or (>= 'A' and <= 'Z'))
+            {
+                intoUpper.Add(codePoint);
+            }
+        }
+
+        Assert.Equal(0x212A, Assert.Single(intoLower));
+        Assert.Equal(0x017F, Assert.Single(intoUpper));
+    }
+
+    [Fact]
+    public void Decode_RejectsEveryNonAsciiBmpCodePointInBase36Payload()
+    {
+        // The #43 fix validates the RAW payload as ASCII letters/digits before any case-folding,
+        // so no non-ASCII code point may be accepted anywhere in a base36 payload — independent of
+        // what the runtime's case-fold tables map it to. Brute-force the whole BMP at a fixed
+        // payload position on the lower path (the upper path shares the same raw-character guard).
+        var kIndex = KnownCidBase36Lower.IndexOf('k', 1);
+        for (var codePoint = 0x80; codePoint <= 0xFFFF; codePoint++)
+        {
+            var mutated = string.Concat(
+                KnownCidBase36Lower.AsSpan(0, kIndex),
+                ((char)codePoint).ToString(),
+                KnownCidBase36Lower.AsSpan(kIndex + 1));
+
+            Assert.False(
+                Multibase.TryDecode(mutated, out _, out _),
+                $"U+{codePoint:X4} was accepted in a base36 payload.");
+        }
+    }
+
+    [Theory]
+    [InlineData(0x1D5C0)]  // MATHEMATICAL SANS-SERIF SMALL K
+    [InlineData(0x1D542)]  // MATHEMATICAL DOUBLE-STRUCK CAPITAL K
+    [InlineData(0x10428)]  // DESERET SMALL LETTER LONG I (has a case mapping)
+    [InlineData(0x1F130)]  // SQUARED LATIN CAPITAL LETTER A
+    public void Decode_RejectsAstralCodePointInBase36Payload(int codePoint)
+    {
+        // Astral (non-BMP) code points arrive as a surrogate pair; the raw ASCII pre-check must
+        // reject each surrogate char. Pins the guard against a future refactor that folds or
+        // validates at rune level before the ASCII gate. See issue #43.
+        var kIndex = KnownCidBase36Lower.IndexOf('k', 1);
+        var mutated = string.Concat(
+            KnownCidBase36Lower.AsSpan(0, kIndex),
+            char.ConvertFromUtf32(codePoint),
+            KnownCidBase36Lower.AsSpan(kIndex + 1));
+
+        Assert.False(Multibase.TryDecode(mutated, out _, out _));
+        Assert.Throws<CidFormatException>(() => Multibase.Decode(mutated));
     }
 }
