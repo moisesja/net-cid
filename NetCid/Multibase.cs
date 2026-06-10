@@ -24,11 +24,10 @@ public static class Multibase
         // the Try* paths (#44). Force-build every SimpleBase alphabet this type uses under the
         // invariant culture, so the ambient culture can never poison them. The CLR runs this
         // before any member of this type executes on any thread.
-        var thread = Thread.CurrentThread;
-        var originalCulture = thread.CurrentCulture;
+        var originalCulture = CultureInfo.CurrentCulture;
         try
         {
-            thread.CurrentCulture = CultureInfo.InvariantCulture;
+            CultureInfo.CurrentCulture = CultureInfo.InvariantCulture;
             _ = SimpleBase.Base32.FileCoin.Decode("aa");
             _ = SimpleBase.Base32.Rfc4648.Decode("AA");
             _ = SimpleBase.Base36.LowerCase.Decode("00");
@@ -43,7 +42,7 @@ public static class Multibase
         }
         finally
         {
-            thread.CurrentCulture = originalCulture;
+            CultureInfo.CurrentCulture = originalCulture;
         }
     }
 
