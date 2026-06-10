@@ -23,9 +23,12 @@ env:
   # cyberphone/json-canonicalization release asset — 100M ECMA-262
   # Number::toString conformance vectors. The release tag is stable.
   CONFORMANCE_URL: https://github.com/cyberphone/json-canonicalization/releases/download/es6testfile/es6testfile100m.txt.gz
-  # Pin once known; the job logs the observed SHA-256 every run so the value
-  # can be filled in on the next change.
-  CONFORMANCE_EXPECTED_SHA256: ''
+  # SHA-256 of es6testfile100m.txt.gz at the CONFORMANCE_URL above (#48). Verified from
+  # three independent observations on 2026-06-10: two separate CI runs' logged "observed
+  # SHA-256" values (runs 27122934027 and 27111956890, different days/cache states) and a
+  # fresh local download of the upstream release asset. With this set, the Verify SHA-256
+  # step below hard-fails the job on any mismatch instead of warn-only.
+  CONFORMANCE_EXPECTED_SHA256: '545455ec9e74b68042c22a2607fb9d4a5f5fdb3c79f883ce864c75189a70705f'
 
 jobs:
   conformance:
