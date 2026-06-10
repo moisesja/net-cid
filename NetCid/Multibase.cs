@@ -1,4 +1,5 @@
 using System.Buffers.Text;
+using System.Globalization;
 
 namespace NetCid;
 
@@ -11,6 +12,40 @@ public static class Multibase
     /// Default maximum allowed length for multibase text input.
     /// </summary>
     public const int DefaultMaxInputLength = 4096;
+
+    static Multibase()
+    {
+        // SimpleBase builds its case-insensitive base32/base36 reverse-lookup tables with
+        // culture-sensitive char.ToUpper/ToLower on first use. Under a dotless-i culture
+        // (tr-TR, az-Latn-AZ), 'i'.ToUpper() is U+0130 (304), which indexes past the table and
+        // throws IndexOutOfRangeException from inside SimpleBase's static Lazy initializers.
+        // The Lazy caches that exception and rethrows it on every later call, bricking base32
+        // and base36 for the rest of the process and leaking a non-CidFormatException out of
+        // the Try* paths (#44). Force-build every SimpleBase alphabet this type uses under the
+        // invariant culture, so the ambient culture can never poison them. The CLR runs this
+        // before any member of this type executes on any thread.
+        var thread = Thread.CurrentThread;
+        var originalCulture = thread.CurrentCulture;
+        try
+        {
+            thread.CurrentCulture = CultureInfo.InvariantCulture;
+            _ = SimpleBase.Base32.FileCoin.Decode("aa");
+            _ = SimpleBase.Base32.Rfc4648.Decode("AA");
+            _ = SimpleBase.Base36.LowerCase.Decode("00");
+            _ = SimpleBase.Base36.UpperCase.Decode("00");
+        }
+        catch
+        {
+            // Never fail type initialization: a throwing static constructor would fault EVERY
+            // Multibase member (base58/base64url included) with TypeInitializationException.
+            // If a future SimpleBase version cannot warm, the per-call normalization in
+            // DecodeBase32/DecodeBase36 still converts decoder failures to CidFormatException.
+        }
+        finally
+        {
+            thread.CurrentCulture = originalCulture;
+        }
+    }
 
     private const string Base36LowerAlphabet = "0123456789abcdefghijklmnopqrstuvwxyz";
     private const string Base36UpperAlphabet = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ";
@@ -170,8 +205,11 @@ public static class Multibase
         {
             return SimpleBase.Base32.FileCoin.Decode(normalized);
         }
-        catch (ArgumentException ex)
+        catch (Exception ex) when (ex is ArgumentException or IndexOutOfRangeException)
         {
+            // IndexOutOfRangeException covers a SimpleBase alphabet that escaped the
+            // invariant-culture warm-up in the static constructor (#44); it must surface as
+            // CidFormatException so the Try* no-throw contract holds.
             throw new CidFormatException("Invalid base32 character.", ex);
         }
     }
@@ -203,17 +241,21 @@ public static class Multibase
             : payload.ToString().ToLowerInvariant();
 
         var alphabetIndex = toUpper ? Base36UpperIndex : Base36LowerIndex;
-        var decoder = toUpper
-            ? (SimpleBase.IBaseCoder)SimpleBase.Base36.UpperCase
-            : SimpleBase.Base36.LowerCase;
 
         ValidatePositionalPayload(normalized, alphabetIndex);
 
         try
         {
+            // Resolve the decoder inside the try: the property access itself triggers
+            // SimpleBase's lazy alphabet construction, which is where a culture-poisoned
+            // initialization throws (#44).
+            var decoder = toUpper
+                ? (SimpleBase.IBaseCoder)SimpleBase.Base36.UpperCase
+                : SimpleBase.Base36.LowerCase;
+
             return decoder.Decode(normalized);
         }
-        catch (ArgumentException ex)
+        catch (Exception ex) when (ex is ArgumentException or IndexOutOfRangeException)
         {
             throw new CidFormatException("Invalid character for multibase payload.", ex);
         }
