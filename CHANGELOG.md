@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- `JcsCanonicalizer` now throws the documented `JcsFormatException` (instead of leaking System.Text.Json's `ArgumentException`) when `NaN`/`±Infinity` hides inside a `JsonValue` wrapping a raw CLR object (e.g. a `Dictionary`/POCO), across all `Canonicalize` overloads and `Cid.FromCanonicalJson`. The failure was already closed (no canonical bytes were produced) — only the exception type violated the documented contract. Parsed JSON text is unaffected (System.Text.Json rejects `NaN`/`Infinity` tokens at parse time); only programmatic node construction could reach this path ([#47](https://github.com/moisesja/net-cid/issues/47)).
+
 ### Security
 
 - The release workflow now fails closed when run from a non-tag ref: the tag-vs-version guard errors (instead of exiting 0) and the Pack/Publish steps are additionally gated on `github.ref_type == 'tag'`, so a `workflow_dispatch` launched from a branch can no longer bypass the guard and publish an unverified `<Version>`. Also removed `--skip-duplicate` from `dotnet nuget push`, so re-publishing an already-published version fails loudly instead of being silently swallowed ([#46](https://github.com/moisesja/net-cid/issues/46)).
