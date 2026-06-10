@@ -37,9 +37,14 @@ jobs:
       - name: Verify tag matches package version
         run: |
           set -euo pipefail
+          # Publishing is only valid from a tag ref. A workflow_dispatch launched from a
+          # branch (the dispatch default) used to skip this check with exit 0 and publish
+          # whatever <Version> the csproj carried, with no tag/version correspondence
+          # enforced — fail closed instead (#46). Dispatching against a tag still works:
+          # it yields GITHUB_REF_TYPE=tag and takes the verification path below.
           if [ "${GITHUB_REF_TYPE}" != "tag" ]; then
-            echo "Not a tag ref (${GITHUB_REF_TYPE}=${GITHUB_REF_NAME}); skipping tag/version check."
-            exit 0
+            echo "::error::Release publish requires a tag ref; got ${GITHUB_REF_TYPE}=${GITHUB_REF_NAME}. Push a v* tag (or dispatch against one)."
+            exit 1
           fi
           tag="${GITHUB_REF_NAME#v}"
           ver="$(sed -n 's:.*<Version>\(.*\)</Version>.*:\1:p' NetCid/NetCid.csproj | head -1)"
@@ -47,18 +52,24 @@ jobs:
           [ "$tag" = "$ver" ] || { echo "::error::Tag v$tag does not match <Version> $ver"; exit 1; }
 
       - name: Pack
+        # ref_type gate: defense-in-depth so Pack/Publish cannot run from a non-tag ref
+        # even if the guard step above is ever edited or removed (#46).
+        if: github.ref_type == 'tag'
         run: dotnet pack NetCid/NetCid.csproj -c Release --no-build -o artifacts --tl:off
 
       - name: Publish NuGet Packages
+        if: github.ref_type == 'tag'
         env:
           NUGET_API_KEY: ${{ secrets.NUGET_API_KEY }}
         run: |
+          # No --skip-duplicate: re-publishing an already-published version must fail
+          # loudly (NuGet 409) rather than exit 0, preserving the fail-fast intent of
+          # the tag/version guard (#46). If a partial publish ever needs a retry after
+          # the .nupkg landed but the .snupkg did not, push the .snupkg manually.
           dotnet nuget push "artifacts/*.nupkg" \
             --api-key "$NUGET_API_KEY" \
-            --source "https://api.nuget.org/v3/index.json" \
-            --skip-duplicate
+            --source "https://api.nuget.org/v3/index.json"
 
           dotnet nuget push "artifacts/*.snupkg" \
             --api-key "$NUGET_API_KEY" \
-            --source "https://api.nuget.org/v3/index.json" \
-            --skip-duplicate
+            --source "https://api.nuget.org/v3/index.json"
