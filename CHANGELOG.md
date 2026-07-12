@@ -5,6 +5,16 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.6.1] - 2026-07-12
+
+### Added
+
+- `Multihash.EncodeBase58Btc(hashFunctionCode, digest, includeMultibasePrefix)` — encodes a digest as a complete multihash (`varint(code) ‖ varint(digestLength) ‖ digest`) and renders it as base58btc text in one call. The multibase flag is deliberately required (no default) so bare-vs-`z`-multibase intent is explicit at every call site; no decode counterpart is provided because a bare base58btc string can itself begin with `z`, making an accept-either decoder ambiguous — compose `Multibase.DecodeBase58Btc`/`Multibase.Decode` with `Multihash.Decode` instead. Known-answer tests pin the `varint(code) ‖ varint(len) ‖ digest` wire shape and the bare (`Qm…`) vs multibase (`zQm…`) text forms ([#62](https://github.com/moisesja/net-cid/issues/62)).
+
+### Changed
+
+- Documentation-only hardening against multicodec/multihash misuse (no behavioral changes, no deprecations): XML docs on `Multibase.Encode`/`EncodeBase58Btc`/`DecodeBase58Btc` now call out the opposite `includePrefix` defaults and the bare-vs-multibase distinction; `Multicodec.Prefix` docs state its output is multicodec-tagged data, not a multihash (33 vs 34 bytes for SHA-256), and route digest callers to `Multihash` and key callers to `Multikey`; README gained a "Multihash vs Multicodec.Prefix, and bare vs multibase base58btc" section with the known-answer vector; the multihash and multibase examples demonstrate the distinction. Prompted by the did:webvh SCID misuse in [net-did#95](https://github.com/moisesja/net-did/issues/95) ([#62](https://github.com/moisesja/net-cid/issues/62)).
+
 ## [1.6.0] - 2026-06-10
 
 ### Added
@@ -108,7 +118,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - SHA-256 and SHA-512 multihash support
 - Core multicodec constants (raw, dag-pb, dag-cbor, etc.)
 
-[Unreleased]: https://github.com/moisesja/net-cid/compare/v1.6.0...HEAD
+[Unreleased]: https://github.com/moisesja/net-cid/compare/v1.6.1...HEAD
+[1.6.1]: https://github.com/moisesja/net-cid/compare/v1.6.0...v1.6.1
 [1.6.0]: https://github.com/moisesja/net-cid/compare/v1.5.0...v1.6.0
 [1.5.0]: https://github.com/moisesja/net-cid/compare/v1.4.0...v1.5.0
 [1.4.0]: https://github.com/moisesja/net-cid/compare/v1.3.0...v1.4.0

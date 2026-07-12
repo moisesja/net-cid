@@ -87,8 +87,16 @@ public static class Multicodec
     public static bool TryGetCode(string name, out ulong code) => CodesByName.TryGetValue(name, out code);
 
     /// <summary>
-    /// Prefix raw bytes with the varint-encoded multicodec tag.
+    /// Prefix raw bytes with the varint-encoded multicodec tag: varint(codec) || rawBytes.
     /// </summary>
+    /// <remarks>
+    /// The output is multicodec-tagged data, not a multihash: there is no digest-length varint.
+    /// Do not use this to build a multihash from a digest — use <see cref="Multihash.Encode"/>
+    /// (or <see cref="Multihash.EncodeBase58Btc"/> for base58btc text); for a SHA-256 digest the
+    /// two differ (33 bytes tagged vs 34 bytes multihash) and are not interoperable.
+    /// Tagging then multibase-encoding IS the correct shape for public keys
+    /// (<c>did:key</c>, <c>publicKeyMultibase</c>) — use <see cref="Multikey"/> for those.
+    /// </remarks>
     public static byte[] Prefix(ulong codec, ReadOnlySpan<byte> rawBytes)
     {
         var prefixLength = Varint.GetEncodedLength(codec);

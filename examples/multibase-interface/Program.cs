@@ -22,6 +22,19 @@ foreach (var encoding in encodings)
     Console.WriteLine($"  {encoding,-12} (prefix '{Multibase.GetPrefix(encoding)}'): {encoded}");
 }
 
+// --- Bare base58btc vs base58btc multibase ---
+
+Console.WriteLine("\nBare base58btc vs base58btc multibase (note the differing defaults):\n");
+
+// Multibase.Encode defaults includePrefix: true; Multibase.EncodeBase58Btc defaults
+// includePrefix: false. "base58btc" in a spec does not automatically mean multibase —
+// pass the argument explicitly so the intent is visible.
+var bareB58 = Multibase.EncodeBase58Btc(content, includePrefix: false);
+var multibaseB58 = Multibase.Encode(content, MultibaseEncoding.Base58Btc, includePrefix: true);
+
+Console.WriteLine($"  EncodeBase58Btc(..., includePrefix: false): {bareB58}");
+Console.WriteLine($"  Encode(..., Base58Btc, includePrefix: true): {multibaseB58}");
+
 // --- Decode with auto-detection ---
 
 Console.WriteLine("\nAuto-detecting encoding from multibase prefix:\n");
