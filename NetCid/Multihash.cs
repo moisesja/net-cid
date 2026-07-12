@@ -15,6 +15,9 @@ public static class Multihash
     /// varint(codec) || data with no digest-length varint and is not a multihash.
     /// For a SHA-256 digest a multihash is 34 bytes (<c>0x12 0x20 || digest</c>);
     /// the multicodec-tagged form is 33 bytes.
+    /// The digest length is encoded from the actual span, never validated against
+    /// <paramref name="hashFunctionCode"/> — supply a digest of the correct length
+    /// for the declared hash function.
     /// </remarks>
     public static byte[] Encode(ulong hashFunctionCode, ReadOnlySpan<byte> digest)
         => new MultihashDigest(hashFunctionCode, digest).ToByteArray();
@@ -24,7 +27,11 @@ public static class Multihash
     /// and render it as base58btc text in one call.
     /// </summary>
     /// <param name="hashFunctionCode">The multihash function code, e.g. <see cref="MultihashCode.Sha2_256"/>.</param>
-    /// <param name="digest">The raw digest bytes.</param>
+    /// <param name="digest">
+    /// The raw digest bytes. The length is encoded from the actual span, never validated
+    /// against <paramref name="hashFunctionCode"/> — supply a digest of the correct length
+    /// for the declared hash function.
+    /// </param>
     /// <param name="includeMultibasePrefix">
     /// <see langword="true"/> to return a self-describing multibase string with a leading <c>'z'</c>
     /// (use when the governing protocol says <c>multibase(...)</c>);
