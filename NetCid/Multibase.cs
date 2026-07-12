@@ -54,6 +54,18 @@ public static class Multibase
     private static readonly IReadOnlyDictionary<char, int> Base36UpperIndex = BuildAlphabetIndex(Base36UpperAlphabet);
     private static readonly IReadOnlyDictionary<char, int> Base58BtcIndex = BuildAlphabetIndex(Base58BtcAlphabet);
 
+    /// <summary>
+    /// Encode bytes in the given base encoding, optionally as a self-describing multibase string.
+    /// </summary>
+    /// <param name="bytes">The bytes to encode.</param>
+    /// <param name="encoding">The base encoding to use.</param>
+    /// <param name="includePrefix">
+    /// Defaults to <see langword="true"/>: the result carries the multibase prefix character
+    /// (e.g. <c>'z'</c> for base58btc). Pass <see langword="false"/> for the bare base encoding
+    /// when the governing protocol does not use multibase. Note that
+    /// <see cref="EncodeBase58Btc(ReadOnlySpan{byte}, bool)"/> has the opposite default —
+    /// prefer passing the argument explicitly at call sites.
+    /// </param>
     public static string Encode(ReadOnlySpan<byte> bytes, MultibaseEncoding encoding, bool includePrefix = true)
     {
         var payload = EncodeWithoutPrefix(bytes, encoding);
@@ -65,6 +77,22 @@ public static class Multibase
         return string.Concat(GetPrefix(encoding), payload);
     }
 
+    /// <summary>
+    /// Encode bytes as base58btc text.
+    /// </summary>
+    /// <param name="bytes">The bytes to encode.</param>
+    /// <param name="includePrefix">
+    /// Defaults to <see langword="false"/>: the result is bare base58btc with no leading
+    /// <c>'z'</c> (the form CIDv0 uses). Pass <see langword="true"/> for a self-describing
+    /// multibase string. This default is the opposite of
+    /// <see cref="Encode(ReadOnlySpan{byte}, MultibaseEncoding, bool)"/> — prefer passing the
+    /// argument explicitly at call sites. "base58btc" in a protocol spec does not automatically
+    /// mean "base58btc multibase".
+    /// </param>
+    /// <remarks>
+    /// To encode a digest as a complete multihash and then as base58btc in one call, use
+    /// <see cref="Multihash.EncodeBase58Btc"/>.
+    /// </remarks>
     public static string EncodeBase58Btc(ReadOnlySpan<byte> bytes, bool includePrefix = false)
         => Encode(bytes, MultibaseEncoding.Base58Btc, includePrefix);
 
@@ -121,9 +149,25 @@ public static class Multibase
         }
     }
 
+    /// <summary>
+    /// Decode a bare base58btc payload (no multibase prefix).
+    /// </summary>
+    /// <remarks>
+    /// The whole input is treated as base58btc digits: a leading <c>'z'</c> is decoded as a
+    /// digit, not stripped. For self-describing multibase strings use
+    /// <see cref="Decode(string)"/> or <see cref="TryDecode(string, out byte[], out MultibaseEncoding)"/>.
+    /// </remarks>
     public static byte[] DecodeBase58Btc(string payload)
         => DecodeBase58Btc(payload, DefaultMaxInputLength);
 
+    /// <summary>
+    /// Decode a bare base58btc payload (no multibase prefix) with a custom input-length limit.
+    /// </summary>
+    /// <remarks>
+    /// The whole input is treated as base58btc digits: a leading <c>'z'</c> is decoded as a
+    /// digit, not stripped. For self-describing multibase strings use
+    /// <see cref="Decode(string, out MultibaseEncoding, int)"/>.
+    /// </remarks>
     public static byte[] DecodeBase58Btc(string payload, int maxInputLength)
     {
         ValidateLimit(maxInputLength);

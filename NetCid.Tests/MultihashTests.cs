@@ -4,6 +4,89 @@ namespace NetCid.Tests;
 
 public sealed class MultihashTests
 {
+    // Known-answer vector from issue #62: SHA-256 of the UTF-8 input string.
+    private const string KnownInput = "z6MkhaXgBZDvotDkL5257faiztiGiC2QtKLGpbnnEGta2doK";
+    private const string KnownDigestHex = "79d8444cc417275da1aa2ed425afb37ba26353270bb09fa29ef8aa4318e13f41";
+    private const string KnownMultihashHex = "1220" + KnownDigestHex;
+    private const string KnownBareBase58 = "QmWYHJqmhJHuzQHMQ33piy86hYQwwNBKEFmCKzRMTi7UHN";
+
+    private static byte[] KnownDigest()
+        => SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(KnownInput));
+
+    [Fact]
+    public void Encode_MatchesKnownAnswerVector()
+    {
+        var digest = KnownDigest();
+        Assert.Equal(KnownDigestHex, Convert.ToHexString(digest).ToLowerInvariant());
+
+        var multihash = Multihash.Encode(MultihashCode.Sha2_256, digest);
+
+        Assert.Equal(KnownMultihashHex, Convert.ToHexString(multihash).ToLowerInvariant());
+        Assert.Equal(34, multihash.Length);
+        Assert.Equal(0x12, multihash[0]); // sha2-256 code
+        Assert.Equal(0x20, multihash[1]); // digest length 32
+        Assert.Equal(digest, multihash[2..]);
+    }
+
+    [Fact]
+    public void EncodeBase58Btc_BareMatchesKnownAnswer()
+    {
+        var bare = Multihash.EncodeBase58Btc(MultihashCode.Sha2_256, KnownDigest(), includeMultibasePrefix: false);
+
+        Assert.Equal(KnownBareBase58, bare);
+        Assert.False(bare.StartsWith('z'));
+    }
+
+    [Fact]
+    public void EncodeBase58Btc_MultibasePrefixedMatchesKnownAnswer()
+    {
+        var prefixed = Multihash.EncodeBase58Btc(MultihashCode.Sha2_256, KnownDigest(), includeMultibasePrefix: true);
+
+        Assert.Equal("z" + KnownBareBase58, prefixed);
+
+        var decodedBytes = Multibase.Decode(prefixed, out var encoding);
+        Assert.Equal(MultibaseEncoding.Base58Btc, encoding);
+
+        var (code, digest) = Multihash.Decode(decodedBytes);
+        Assert.Equal(MultihashCode.Sha2_256, code);
+        Assert.Equal(KnownDigest(), digest);
+    }
+
+    [Fact]
+    public void EncodeBase58Btc_MatchesManualComposition()
+    {
+        var digest = KnownDigest();
+        var multihash = Multihash.Encode(MultihashCode.Sha2_256, digest);
+
+        Assert.Equal(
+            Multibase.EncodeBase58Btc(multihash, includePrefix: false),
+            Multihash.EncodeBase58Btc(MultihashCode.Sha2_256, digest, includeMultibasePrefix: false));
+        Assert.Equal(
+            Multibase.EncodeBase58Btc(multihash, includePrefix: true),
+            Multihash.EncodeBase58Btc(MultihashCode.Sha2_256, digest, includeMultibasePrefix: true));
+    }
+
+    [Fact]
+    public void EncodeBase58Btc_DiffersFromMulticodecPrefixComposition()
+    {
+        // The exact downstream misuse from net-did#95: Multicodec.Prefix is not a multihash.
+        var digest = KnownDigest();
+        var tagged = Multicodec.Prefix(MultihashCode.Sha2_256, digest);
+
+        Assert.NotEqual(
+            Multibase.EncodeBase58Btc(tagged, includePrefix: false),
+            Multihash.EncodeBase58Btc(MultihashCode.Sha2_256, digest, includeMultibasePrefix: false));
+    }
+
+    [Fact]
+    public void EncodeBase58Btc_ThrowsForOversizedCode()
+    {
+        var digest = KnownDigest();
+
+        Assert.Throws<ArgumentOutOfRangeException>(
+            () => Multihash.EncodeBase58Btc(Varint.MaxValue + 1, digest, includeMultibasePrefix: false));
+    }
+
     [Fact]
     public void Encode_ProducesCorrectMultihashFormat()
     {
