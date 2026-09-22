@@ -45,7 +45,7 @@ jobs:
 
       - name: Restore conformance file from cache
         id: cache-conformance
-        uses: actions/cache@v5
+        uses: actions/cache@v6
         with:
           path: ${{ runner.temp }}/es6testfile100m.txt.gz
           # Bump this key when CONFORMANCE_URL changes (re-publish would change content).
